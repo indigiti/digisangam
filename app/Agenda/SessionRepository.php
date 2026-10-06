@@ -11,7 +11,7 @@ final class SessionRepository
 
     public function all(): array
     {
-        return $this->store->read('agenda/sessions.json', self::defaults());
+        return $this->store->read('agenda/sessions.json', []);
     }
 
     public function create(array $input): array
