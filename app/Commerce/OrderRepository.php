@@ -27,10 +27,28 @@ final class OrderRepository
             'currency'=>strtoupper((string)($input['currency'] ?? 'INR')),
             'status'=>(string)($input['status'] ?? 'pending'),
             'payment_reference'=>(string)($input['payment_reference'] ?? ''),
+            'provider'=>(string)($input['provider'] ?? ''),
             'created_at'=>date(DATE_ATOM),
         ];
         array_unshift($rows, $record);
         $this->store->write('orders/index.json', $rows);
         return $record;
+    }
+
+    public function updatePayment(string $id, array $payment): ?array
+    {
+        $rows=$this->all(); $updated=null;
+        foreach($rows as &$row){
+            if(($row['id']??'')!==$id) continue;
+            $row['status']=(string)($payment['status'] ?? $row['status']);
+            $row['payment_reference']=(string)($payment['payment_reference'] ?? $row['payment_reference']);
+            $row['provider']=(string)($payment['provider'] ?? $row['provider']);
+            $row['updated_at']=date(DATE_ATOM);
+            $updated=$row;
+            break;
+        }
+        unset($row);
+        if($updated!==null) $this->store->write('orders/index.json',$rows);
+        return $updated;
     }
 }
