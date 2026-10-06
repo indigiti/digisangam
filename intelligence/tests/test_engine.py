@@ -41,6 +41,13 @@ class EngineTest(unittest.TestCase):
         result = self.engine.copilot("How are registrations doing?", self.graph, analysis)
         self.assertIn("registrations", result["answer"].lower())
 
+    def test_event_blueprint(self):
+        result = self.engine.event_blueprint("Create a hybrid expo for VIP sponsors exhibitors with approval")
+        self.assertEqual(result["type"], "Expo")
+        self.assertEqual(result["format"], "hybrid")
+        self.assertEqual(result["registration"]["approval_mode"], "manual")
+        self.assertIn("VIP", result["registration"]["categories"])
+
     def test_concierge(self):
         analysis = self.engine.analyze(self.graph)
         result = self.engine.concierge("What sessions should I attend?", "A1", self.graph, analysis)
