@@ -7,7 +7,7 @@ import PublicRegistrationField from '../components/PublicRegistrationField.vue'
 const route=useRoute(),router=useRouter()
 const loading=ref(true),busy=ref(false),error=ref(''),data=ref(null),step=ref(1),selectedTicket=ref('')
 const answers=reactive({}),honeypot=ref('')
-const money=n=>Number(n||0)===0?'Free':new Intl.NumberFormat('en-IN',{style:'currency',currency:'INR',maximumFractionDigits:0}).format(n)
+const money=n=>Number(n||0)===0?'Free':new Intl.NumberFormat('en-IN',{style:'currency',currency:data.value?.event?.currency||'INR',maximumFractionDigits:0}).format(n)
 const selected=computed(()=>data.value?.tickets?.find(x=>x.id===selectedTicket.value)||null)
 const fields=computed(()=>data.value?.registration?.fields||[])
 
@@ -66,7 +66,7 @@ async function openRazorpay(result){
       description:payment.description,
       order_id:payment.provider_order_id,
       prefill:payment.prefill,
-      theme:{color:'#4f46e5'},
+      theme:{color:data.value?.event?.branding?.primary_color||'#4f46e5'},
       handler:async(response)=>{
         try{
           await api.publicVerifyRazorpay({
@@ -102,11 +102,12 @@ async function submit(){
   <div v-if="loading" class="grid min-h-screen place-items-center"><div class="h-10 w-10 animate-spin rounded-full border-4 border-indigo-200 border-t-indigo-600"></div></div>
   <div v-else-if="error&&!data" class="grid min-h-screen place-items-center p-6"><div class="max-w-md text-center"><div class="mx-auto grid h-14 w-14 place-items-center rounded-2xl bg-rose-50 text-xl text-rose-600">!</div><h1 class="mt-4 text-2xl font-black">Registration unavailable</h1><p class="mt-2 text-sm text-slate-500">{{error}}</p></div></div>
   <template v-else-if="data">
-    <section class="relative overflow-hidden bg-slate-950 text-white">
-      <div class="absolute inset-0 opacity-60" style="background:radial-gradient(circle at 75% 15%,#6366f1 0,transparent 28%),radial-gradient(circle at 20% 80%,#06b6d4 0,transparent 30%)"></div>
+    <section class="relative overflow-hidden text-white" :style="{background:data.event.branding?.background_color||'#0f172a'}">
+      <img v-if="data.event.branding?.cover_url" :src="data.event.branding.cover_url" alt="" class="absolute inset-0 h-full w-full object-cover opacity-25"/>
+      <div class="absolute inset-0 opacity-60" :style="{background:`radial-gradient(circle at 75% 15%,${data.event.branding?.primary_color||'#6366f1'} 0,transparent 28%),radial-gradient(circle at 20% 80%,${data.event.branding?.secondary_color||'#06b6d4'} 0,transparent 30%)`}"></div>
       <div class="relative mx-auto max-w-6xl px-5 py-10 sm:px-8 lg:py-16">
-        <div class="flex items-center justify-between"><div class="flex items-center gap-3"><div class="grid h-9 w-9 place-items-center rounded-xl bg-white/10 text-xs font-black">DS</div><span class="text-sm font-bold">DigiSangam</span></div><span class="rounded-full border border-white/15 bg-white/10 px-3 py-1.5 text-xs">{{data.event.status}}</span></div>
-        <div class="mt-14 max-w-3xl"><p class="text-xs font-bold uppercase tracking-[.24em] text-cyan-300">{{data.event.type||'Event'}} · {{data.event.category||'Featured'}}</p><h1 class="mt-4 text-4xl font-black tracking-tight sm:text-5xl lg:text-6xl">{{data.event.name}}</h1><p class="mt-5 max-w-2xl text-base leading-7 text-slate-300">{{data.event.description||'Join us for an exceptional event experience powered by DigiSangam.'}}</p><div class="mt-8 flex flex-wrap gap-3 text-sm"><span class="rounded-xl bg-white/10 px-4 py-2">◷ {{data.event.start_date||data.event.date}}</span><span class="rounded-xl bg-white/10 px-4 py-2">⌖ {{data.event.location}}</span></div></div>
+        <div class="flex items-center justify-between"><div class="flex items-center gap-3"><img v-if="data.event.branding?.logo_url" :src="data.event.branding.logo_url" alt="" class="h-10 w-10 rounded-xl bg-white object-contain p-1"/><div v-else class="grid h-9 w-9 place-items-center rounded-xl bg-white/10 text-xs font-black">DS</div><span class="text-sm font-bold">{{data.event.branding?.brand_name||data.event.name}}</span></div><span class="rounded-full border border-white/15 bg-white/10 px-3 py-1.5 text-xs">{{data.event.status}}</span></div>
+        <div class="mt-14 max-w-3xl"><p class="text-xs font-bold uppercase tracking-[.24em] text-cyan-300">{{data.event.type||'Event'}} · {{data.event.category||'Featured'}}</p><h1 class="mt-4 text-4xl font-black tracking-tight sm:text-5xl lg:text-6xl">{{data.event.public_page?.headline||data.event.name}}</h1><p class="mt-5 max-w-2xl text-base leading-7 text-slate-300">{{data.event.description||'Join us for this event.'}}</p><div class="mt-8 flex flex-wrap gap-3 text-sm"><span class="rounded-xl bg-white/10 px-4 py-2">◷ {{data.event.start_date||data.event.date}}</span><span class="rounded-xl bg-white/10 px-4 py-2">⌖ {{data.event.location}}</span></div></div>
       </div>
     </section>
 
