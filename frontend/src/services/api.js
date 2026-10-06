@@ -48,6 +48,7 @@ export const api={
   decideIntelligenceAction:(id,decision)=>request('/intelligence/actions/'+encodeURIComponent(id)+'/'+(decision==='approved'?'approve':'reject'),{method:'POST',body:'{}'}),
   events:()=>request('/events'),
   event:(id)=>request('/events/'+encodeURIComponent(id)),
+  eventPreview:(id)=>request('/events/'+encodeURIComponent(id)+'/preview'),
   createEvent:(payload)=>request('/events',{method:'POST',body:JSON.stringify(payload)}),
   updateEvent:(id,payload)=>request('/events/'+encodeURIComponent(id),{method:'PATCH',body:JSON.stringify(payload)}),
   registration:(eventId)=>request('/events/'+encodeURIComponent(eventId)+'/registration'),
