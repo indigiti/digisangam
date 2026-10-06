@@ -19,7 +19,7 @@ final class CampaignDispatchService
         $campaign=null;
         foreach($this->campaigns->all() as $row) if(($row['id']??'')===$campaignId){$campaign=$row;break;}
         if(!$campaign) throw new \RuntimeException('Campaign not found.');
-        if(!in_array((string)$campaign['channel'],['email','whatsapp'],true)) throw new \InvalidArgumentException('Unsupported campaign channel.');
+        if(!in_array((string)$campaign['channel'],['email','whatsapp','sms'],true)) throw new \InvalidArgumentException('Unsupported campaign channel.');
         if(in_array((string)($campaign['status']??''),['queued','scheduled','sent'],true)) throw new \RuntimeException('Campaign has already been queued.');
 
         $notBefore='';
