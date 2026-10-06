@@ -39,7 +39,7 @@ final class PrintJobRepository
         $rows=$this->all();$updated=null;
         foreach($rows as &$row){
             if(($row['id']??'')!==$id)continue;
-            foreach(['status','printer','copies'] as $field)if(array_key_exists($field,$input))$row[$field]=$input[$field];
+            foreach(['status','printer','copies','provider','provider_job_id','last_error'] as $field)if(array_key_exists($field,$input))$row[$field]=$input[$field];
             $row['updated_at']=date(DATE_ATOM);$updated=$row;break;
         }
         unset($row);
