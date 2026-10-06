@@ -27,14 +27,16 @@ final class PaymentWebhookService
         $notes = (array)($paymentEntity['notes'] ?? $orderEntity['notes'] ?? []);
         $internalOrderId = (string)($notes['digisangam_order_id'] ?? $orderEntity['receipt'] ?? '');
 
-        if ($internalOrderId === '') throw new \InvalidArgumentException('Webhook does not reference a DigiSangam order.');
-        $order = $this->orders->find($internalOrderId);
-        if (!$order) throw new \RuntimeException('Referenced order was not found.');
+        $providerOrderId=(string)($paymentEntity['order_id'] ?? $orderEntity['id'] ?? '');
+        $order = $internalOrderId!=='' ? $this->orders->find($internalOrderId) : null;
+        if(!$order && $providerOrderId!=='') $order=$this->orders->findByProviderOrderId($providerOrderId);
+        if(!$order) throw new \RuntimeException('Referenced DigiSangam order was not found.');
+        $internalOrderId=(string)$order['id'];
 
         if (in_array($event, ['payment.captured','order.paid'], true)) {
             if (($order['status'] ?? '') === 'paid') return ['ok'=>true,'duplicate'=>true,'order'=>$order];
 
-            $providerPaymentId = (string)($paymentEntity['id'] ?? $orderEntity['id'] ?? $order['payment_reference'] ?? '');
+            $providerPaymentId = (string)($paymentEntity['id'] ?? $order['payment_reference'] ?? '');
             $capture=(new PaymentCaptureService(
                 $this->orders,
                 $this->attendees,
