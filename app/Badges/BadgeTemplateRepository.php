@@ -18,7 +18,7 @@ final class BadgeTemplateRepository
     {
         $record=[
             'id'=>'bdg_'.bin2hex(random_bytes(6)),
-            'event_id'=>(string)($input['event_id']??'evt_001'),
+            'event_id'=>trim((string)($input['event_id'] ?? '')),
             'name'=>trim((string)($input['name']??'Badge Template')),
             'width_mm'=>max(40,(int)($input['width_mm']??100)),
             'height_mm'=>max(40,(int)($input['height_mm']??140)),
@@ -29,6 +29,7 @@ final class BadgeTemplateRepository
             'category'=>(string)($input['category']??'All'),
             'created_at'=>date(DATE_ATOM),
         ];
+        if(($record['event_id']??'')==='') throw new \InvalidArgumentException('Event is required.');
         $rows=$this->all(); array_unshift($rows,$record);
         $this->store->write('badges/templates.json',$rows);
         return $record;
