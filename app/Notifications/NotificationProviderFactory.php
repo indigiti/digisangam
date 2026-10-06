@@ -33,4 +33,14 @@ final class NotificationProviderFactory
             )
             : new LogWhatsAppProvider();
     }
+    public static function sms(): SmsProviderInterface
+    {
+        return strtolower(trim((string)getenv('DIGISANGAM_SMS_PROVIDER')))==='http'
+            ? new HttpSmsProvider(
+                (string)getenv('SMS_HTTP_ENDPOINT'),
+                (string)getenv('SMS_HTTP_TOKEN'),
+                (string)getenv('SMS_SENDER'),
+            )
+            : new LogSmsProvider();
+    }
 }
