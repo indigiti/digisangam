@@ -1,6 +1,21 @@
 <?php
 declare(strict_types=1);
 
+use DigiSangam\Accreditation\AccreditationRepository;
+use DigiSangam\Core\EventJournal\EventJournal;
+use DigiSangam\Credentials\CredentialBindingRepository;
+use DigiSangam\Developer\ApiKeyRepository;
+use DigiSangam\Developer\WebhookOutboxRepository;
+use DigiSangam\Developer\WebhookRepository;
+use DigiSangam\Intelligence\EventBlueprintService;
+use DigiSangam\Media\MediaRepository;
+use DigiSangam\Notifications\LogSmsProvider;
+use DigiSangam\OnGround\WalkInRegistrationService;
+use DigiSangam\Printing\BadgePrintWorker;
+use DigiSangam\Printing\LogPrintProvider;
+use DigiSangam\Reports\OperationalReportService;
+use DigiSangam\Wallet\WalletPassRepository;
+use DigiSangam\Wallet\WalletPassService;
 use DigiSangam\Agenda\SessionAccessService;
 use DigiSangam\Agenda\SessionAttendanceRepository;
 use DigiSangam\Agenda\SessionRepository;
@@ -308,6 +323,77 @@ try{
     expect($blocked,'Unapproved AI action executed.');
     $approved=$proposalRepo->decide($proposal['id'],'approved','usr_manager');
     expect((new ApprovedActionService($store))->execute($approved)['type']==='campaign_draft','Approved AI draft failed.');
+
+    // Remaining roadmap modules: accreditation.
+    $accreditationRepo=new AccreditationRepository($store);
+    $accreditation=$accreditationRepo->create([
+        'event_id'=>$eventId,'attendee_id'=>$vip['id'],'type'=>'Media','quota_pool'=>'Media 50',
+        'valid_from'=>'2027-01-10','valid_until'=>'2027-01-11',
+    ]);
+    $accreditation=$accreditationRepo->update($accreditation['id'],['status'=>'approved'],'usr_manager');
+    $accreditation=$accreditationRepo->update($accreditation['id'],['status'=>'activated'],'usr_manager');
+    expect(($accreditation['status']??'')==='activated','Accreditation lifecycle failed.');
+
+    // Real media persistence uses private storage and metadata.
+    $tmpMedia=tempnam($root,'media-');
+    file_put_contents($tmpMedia,'DigiSangam upload fixture');
+    $media=(new MediaRepository($store))->saveUpload([
+        'error'=>UPLOAD_ERR_OK,'size'=>filesize($tmpMedia),'tmp_name'=>$tmpMedia,'name'=>'fixture.txt',
+    ],$eventId,'accreditation_document',false);
+    expect(($media['event_id']??'')===$eventId && ($media['mime']??'')==='text/plain','Media upload persistence failed.');
+
+    // Wallet issuance lifecycle is available even before provider credentials are configured.
+    $wallet=(new WalletPassService(new WalletPassRepository($store),'wallet-secret'))->issue($event,$vip,$issued['payload'],'google');
+    expect(($wallet['platform']??'')==='google' && in_array(($wallet['status']??''),['ready','provider_configuration_required'],true),'Wallet pass issuance failed.');
+
+    // Developer API keys are hashed, scoped and event-bound.
+    $apiKeys=new ApiKeyRepository($store);
+    $key=$apiKeys->create('Audit integration',['events.read','attendees.read'],$eventId);
+    expect(str_starts_with((string)($key['key']??''),'dsk_'),'Developer API key was not issued.');
+    expect(($apiKeys->authenticate($key['key'],'attendees.read',$eventId)['id']??'')===($key['id']??''),'Developer API key authentication failed.');
+    expect($apiKeys->authenticate($key['key'],'analytics.read',$eventId)===null,'Developer API scope enforcement failed.');
+
+    // Webhook endpoints queue signed asynchronous deliveries from the journal.
+    $webhooks=new WebhookRepository($store);
+    $webhook=$webhooks->create(['event_id'=>$eventId,'url'=>'https://example.invalid/digisangam','events'=>['audit.test']]);
+    (new EventJournal($store))->append('audit.test',['event_id'=>$eventId,'attendee_id'=>$vip['id']]);
+    $webhookQueue=(new WebhookOutboxRepository($store))->all();
+    expect(count($webhookQueue)===1 && ($webhookQueue[0]['webhook_id']??'')===$webhook['id'],'Developer webhook outbox was not queued.');
+
+    // NFC/RFID binding is resolved by the same scanner policy engine.
+    $bindings=new CredentialBindingRepository($store);
+    $binding=$bindings->bind($eventId,$vip['id'],'rfid','A1B2C3');
+    $boundScanner=new ScannerService($credentials,$attendees,$orders,$checkins,new AccessPolicyService($venueRepo),new AccessEventRepository($store),$bindings);
+    $rfidVerify=$boundScanner->verify('rfid:A1B2C3','zone_vip');
+    expect(($rfidVerify['allowed']??false)===true && ($rfidVerify['credential_source']??'')==='RFID','RFID credential binding failed.');
+
+    // Badge printer worker reaches a real provider abstraction; log provider is truthfully simulated.
+    $print2=(new PrintJobRepository($store))->create(['event_id'=>$eventId,'attendee_id'=>$vip['id'],'template_id'=>$badge['id']]);
+    $printRun=(new BadgePrintWorker(new PrintJobRepository($store),$attendees,$badgeRepo,new LogPrintProvider()))->run(10);
+    expect(($printRun['simulated']??0)>=1,'Badge print provider abstraction failed.');
+
+    // SMS uses the same retryable notification worker and is not falsely marked delivered with log provider.
+    $smsOutbox=new NotificationOutbox($store);
+    $smsOutbox->queue('sms','custom_campaign',['phone'=>'919999999999'],['event_id'=>$eventId,'content'=>'SMS audit']);
+    $smsWorker=new NotificationWorker($smsOutbox,new NotificationTemplateRenderer(),new LogEmailProvider(),new LogWhatsAppProvider(),null,new LogSmsProvider());
+    $smsResult=$smsWorker->run(25);
+    expect(($smsResult['simulated']??0)>=1,'SMS notification provider path failed.');
+
+    // AI Event Builder produces an editable complete draft blueprint.
+    $blueprint=(new EventBlueprintService())->build('Create a hybrid expo for VIP speakers sponsors and exhibitors with approval');
+    expect(($blueprint['type']??'')==='Expo' && ($blueprint['format']??'')==='hybrid' && in_array('VIP',$blueprint['registration']['categories']??[],true),'AI Event Builder blueprint failed.');
+
+    // Advanced reports aggregate and export real event data.
+    $reports=new OperationalReportService($store);
+    $report=$reports->summary($eventId);
+    expect(($report['registrations']??0)===2 && ($report['approved_accreditations']??0)===1,'Operational report summary failed.');
+    expect(str_contains($reports->export($eventId,'attendees'),'Vip User'),'Operational CSV export failed.');
+
+    // Walk-in registration creates a real attendee and stable credential.
+    $walkin=(new WalkInRegistrationService($events,$registration,$tickets,$attendees,$orders,$credentials))->register($eventId,[
+        'name'=>'Walk In User','phone'=>'918888888888','category'=>'General','payment_settled'=>true,
+    ]);
+    expect(($walkin['attendee']['source']??'')==='walk_in' && !empty($walkin['credential']['payload']),'Walk-in registration failed.');
 
     // Payment signatures.
     $providerOrder='order_test';$payment='pay_test';$secret='rzp-secret';
