@@ -35,36 +35,18 @@ final class PaymentWebhookService
             if (($order['status'] ?? '') === 'paid') return ['ok'=>true,'duplicate'=>true,'order'=>$order];
 
             $providerPaymentId = (string)($paymentEntity['id'] ?? $orderEntity['id'] ?? $order['payment_reference'] ?? '');
-            $order = $this->orders->updatePayment($internalOrderId, [
-                'status'=>'paid',
-                'provider'=>'razorpay',
-                'payment_reference'=>$providerPaymentId,
-            ]) ?? $order;
-
-            $attendee = $this->attendees->find((string)$order['attendee_id']);
-            if ($attendee) {
-                $schema = $this->registration->schema((string)$order['event_id']);
-                if (($schema['approval_mode'] ?? 'auto') !== 'manual') {
-                    $attendee = $this->attendees->update((string)$attendee['id'], ['status'=>'Confirmed']) ?? $attendee;
-                }
-                $this->notifications->queue('email','payment_confirmed',['email'=>$attendee['email'] ?? ''],[
-                    'event_id'=>$order['event_id'],'attendee_id'=>$attendee['id'],'order_id'=>$order['id'],
-                    'confirmation_token'=>$attendee['confirmation_token'] ?? '',
-                ]);
-                if (!empty($attendee['phone'])) {
-                    $this->notifications->queue('whatsapp','payment_confirmed',['phone'=>$attendee['phone']],[
-                        'event_id'=>$order['event_id'],'attendee_id'=>$attendee['id'],'order_id'=>$order['id'],
-                    ]);
-                }
-            }
-
-            $this->journal->append('payment.captured',[
-                'order_id'=>$order['id'],'provider'=>'razorpay','payment_reference'=>$providerPaymentId,
-            ]);
-            return ['ok'=>true,'order'=>$order,'attendee'=>$attendee ?? null];
+            $capture=(new PaymentCaptureService(
+                $this->orders,
+                $this->attendees,
+                $this->registration,
+                $this->notifications,
+                $this->journal,
+            ))->capture($internalOrderId,'razorpay',$providerPaymentId);
+            return ['ok'=>true]+$capture;
         }
 
         if ($event === 'payment.failed') {
+            if (($order['status'] ?? '') === 'paid') return ['ok'=>true,'ignored'=>true,'reason'=>'ALREADY_PAID'];
             $order = $this->orders->updatePayment($internalOrderId,[
                 'status'=>'failed',
                 'provider'=>'razorpay',
