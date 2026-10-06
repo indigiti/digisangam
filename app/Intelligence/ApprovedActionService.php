@@ -15,7 +15,8 @@ final class ApprovedActionService
     {
         if(($proposal['status']??'')!=='approved') throw new \RuntimeException('Only approved action proposals can execute.');
         $payload=(array)($proposal['payload']??[]);
-        $eventId=(string)($proposal['event_id']??'evt_001');
+        $eventId=trim((string)($proposal['event_id']??''));
+        if($eventId==='') throw new \InvalidArgumentException('Approved action is missing event scope.');
 
         return match((string)($proposal['type']??'')){
             'campaign_draft'=>[
