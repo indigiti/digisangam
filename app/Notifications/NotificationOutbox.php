@@ -30,8 +30,13 @@ final class NotificationOutbox
 
     public function pending(int $limit=25): array
     {
+        $now=time();
         $rows=$this->store->read('notifications/outbox.json',[]);
-        $pending=array_values(array_filter($rows,static fn(array $row): bool => in_array($row['status']??'queued',['queued','retry'],true)));
+        $pending=array_values(array_filter($rows,static function(array $row) use ($now): bool {
+            if(!in_array($row['status']??'queued',['queued','retry'],true)) return false;
+            $next=(string)($row['next_attempt_at']??'');
+            return $next==='' || (strtotime($next)?:0) <= $now;
+        }));
         return array_slice($pending,0,max(1,$limit));
     }
 
