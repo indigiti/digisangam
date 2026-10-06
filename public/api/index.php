@@ -374,6 +374,30 @@ try {
         JsonResponse::send($workspace);
     }
 
+    if ($method === 'GET' && $path === '/team') {
+        $auth->requirePermission('workspace.view');
+        JsonResponse::send(['users'=>$auth->allUsers(),'roles'=>Authorization::roles()]);
+    }
+    if ($method === 'POST' && $path === '/team') {
+        $actor=$auth->requirePermission('workspace.manage');
+        $input=$body();
+        $user=$auth->createUser(
+            (string)($input['name']??''),
+            (string)($input['email']??''),
+            (string)($input['password']??''),
+            (string)($input['role']??'viewer')
+        );
+        $journal->append('team.user_created',['user_id'=>$user['id'],'role'=>$user['role'],'actor_id'=>$actor['id']]);
+        JsonResponse::send($user,201);
+    }
+    if (preg_match('#^/team/([^/]+)$#',$path,$m) && in_array($method,['PUT','PATCH'],true)) {
+        $actor=$auth->requirePermission('workspace.manage');
+        $user=$auth->updateUser($m[1],$body());
+        if(!$user) JsonResponse::send(['error'=>'User not found.'],404);
+        $journal->append('team.user_updated',['user_id'=>$user['id'],'role'=>$user['role'],'active'=>$user['active']??true,'actor_id'=>$actor['id']]);
+        JsonResponse::send($user);
+    }
+
     if ($method === 'GET' && $path === '/dashboard') {
         $auth->requirePermission('analytics.view');
         JsonResponse::send((new AnalyticsService($store))->dashboard($eventQuery));
