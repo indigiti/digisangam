@@ -26,6 +26,10 @@ use DigiSangam\Intelligence\IntelligenceClient;
 use DigiSangam\Intelligence\LocalIntelligenceEngine;
 use DigiSangam\Invitations\InvitationRepository;
 use DigiSangam\Notifications\NotificationOutbox;
+use DigiSangam\Notifications\NotificationTemplateRenderer;
+use DigiSangam\Notifications\NotificationWorker;
+use DigiSangam\Notifications\LogEmailProvider;
+use DigiSangam\Notifications\LogWhatsAppProvider;
 use DigiSangam\OnGround\AccessEventRepository;
 use DigiSangam\OnGround\AccessPolicyService;
 use DigiSangam\OnGround\CheckinRepository;
@@ -110,6 +114,19 @@ try{
         ],
     ]);
     expect($schema['event_id']===$eventId && count($schema['categories'])===2,'Registration schema failed.');
+
+    $invalidChoiceBlocked=false;
+    try{
+        $registration->save($eventId,[
+            'fields'=>[
+                ['id'=>'fld_name','label'=>'Full Name','type'=>'text','required'=>true,'visibility'=>'always'],
+                ['id'=>'fld_email','label'=>'Email','type'=>'email','required'=>true,'visibility'=>'always'],
+                ['id'=>'fld_category','label'=>'Category','type'=>'select','required'=>true,'visibility'=>'always'],
+                ['id'=>'fld_bad','label'=>'Broken Choice','type'=>'select','required'=>false,'visibility'=>'always'],
+            ],
+        ]);
+    }catch(InvalidArgumentException){$invalidChoiceBlocked=true;}
+    expect($invalidChoiceBlocked,'Choice field without options was accepted.');
 
     $venueRepo=new VenueRepository($store);
     $venue=$venueRepo->save($eventId,[
@@ -224,6 +241,13 @@ try{
     expect($run['matched']===1,'Workflow did not execute.');
     expect(count($outbox->pending(25))===1,'Delayed workflow action was available too early.');
 
+    $outboxCountBeforeDryRun=count($outbox->all());
+    $dryRun=(new WorkflowEngine($workflowRepo,$outbox))->fire('attendee.confirmed',[
+        'event_id'=>$eventId,'attendee_id'=>$vip['id'],'email'=>'preview@invalid.example','phone'=>'0000000000',
+    ],true);
+    expect(($dryRun['dry_run']??false)===true && $dryRun['matched']===1,'Workflow dry-run did not match.');
+    expect(count($outbox->all())===$outboxCountBeforeDryRun,'Workflow dry-run mutated the notification outbox.');
+
     $campaignRepo=new CampaignRepository($store);
     $campaign=$campaignRepo->create([
         'event_id'=>$eventId,'name'=>'VIP Update','channel'=>'email','subject'=>'VIP','content'=>'Hello VIP',
@@ -231,6 +255,24 @@ try{
     ]);
     $dispatch=(new CampaignDispatchService($campaignRepo,$attendees,$outbox))->dispatch($campaign['id']);
     expect($dispatch['matched']===1 && $dispatch['queued']===1,'Campaign segmentation failed.');
+
+    $duplicateCampaignBlocked=false;
+    try{(new CampaignDispatchService($campaignRepo,$attendees,$outbox))->dispatch($campaign['id']);}catch(RuntimeException){$duplicateCampaignBlocked=true;}
+    expect($duplicateCampaignBlocked,'Campaign could be queued twice.');
+
+    $worker=new NotificationWorker(
+        $outbox,
+        new NotificationTemplateRenderer(),
+        new LogEmailProvider(),
+        new LogWhatsAppProvider(),
+        $campaignRepo,
+    );
+    $workerResult=$worker->run(25);
+    expect(($workerResult['simulated']??0)>=1,'Log providers were not reported as simulated.');
+    $campaignAfterWorker=null;
+    foreach($campaignRepo->all() as $row) if(($row['id']??'')===$campaign['id']){$campaignAfterWorker=$row;break;}
+    expect(($campaignAfterWorker['status']??'')==='simulated','Campaign log-provider delivery was falsely marked as sent.');
+    expect((int)($campaignAfterWorker['simulated_count']??0)===1,'Campaign simulated delivery count is incorrect.');
 
     $print=(new PrintJobRepository($store))->create(['event_id'=>$eventId,'attendee_id'=>$vip['id'],'template_id'=>$badge['id']]);
     expect(($print['status']??'')==='queued','Badge print queue failed.');
