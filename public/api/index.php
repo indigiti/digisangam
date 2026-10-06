@@ -59,6 +59,7 @@ use DigiSangam\Intelligence\EventBlueprintService;
 use DigiSangam\Media\MediaRepository;
 use DigiSangam\OnGround\WalkInRegistrationService;
 use DigiSangam\Reports\OperationalReportService;
+use DigiSangam\Reports\ReportDefinitionRepository;
 use DigiSangam\Wallet\WalletPassRepository;
 use DigiSangam\Wallet\WalletPassService;
 
@@ -485,6 +486,27 @@ try {
         $automation()->fire('person.registered',$result['attendee']);
         if(($result['attendee']['status']??'')==='Confirmed')$automation()->fire('attendee.confirmed',$result['attendee']);
         JsonResponse::send($result,201);
+    }
+
+    if ($method === 'GET' && $path === '/report-definitions') {
+        $auth->requirePermission('reports.view');
+        JsonResponse::send($forEvent((new ReportDefinitionRepository($store))->all(),$eventQuery));
+    }
+    if ($method === 'POST' && $path === '/report-definitions') {
+        $auth->requirePermission('reports.manage');$input=$body();$requireEvent((string)($input['event_id']??''));
+        JsonResponse::send((new ReportDefinitionRepository($store))->create($input),201);
+    }
+    if (preg_match('#^/report-definitions/([^/]+)$#',$path,$m) && in_array($method,['PATCH','PUT'],true)) {
+        $auth->requirePermission('reports.manage');$row=(new ReportDefinitionRepository($store))->update($m[1],$body());JsonResponse::send($row??['error'=>'Report definition not found.'],$row?200:404);
+    }
+    if ($method === 'DELETE' && preg_match('#^/report-definitions/([^/]+)$#',$path,$m)) {
+        $auth->requirePermission('reports.manage');JsonResponse::send(['deleted'=>(new ReportDefinitionRepository($store))->delete($m[1])]);
+    }
+    if ($method === 'GET' && preg_match('#^/reports/export-definition/([^/]+)$#',$path,$m)) {
+        $auth->requirePermission('reports.view');$definition=(new ReportDefinitionRepository($store))->find($m[1]);
+        if(!$definition) JsonResponse::send(['error'=>'Report definition not found.'],404);
+        $csv=(new OperationalReportService($store))->exportDefinition($definition);
+        header('Content-Type: text/csv; charset=utf-8');header('Content-Disposition: attachment; filename="digisangam-custom-report.csv"');echo $csv;exit;
     }
 
     if ($method === 'GET' && $path === '/reports') {
