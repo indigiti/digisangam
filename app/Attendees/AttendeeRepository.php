@@ -20,17 +20,24 @@ final class AttendeeRepository
         return null;
     }
 
+    public function findByConfirmationToken(string $token): ?array
+    {
+        foreach ($this->all() as $row) {
+            if (!empty($row['confirmation_token']) && hash_equals((string)$row['confirmation_token'], $token)) return $row;
+        }
+        return null;
+    }
+
     public function create(array $input): array
     {
         $rows = $this->all();
         $name = trim((string)($input['name'] ?? ''));
         $email = strtolower(trim((string)($input['email'] ?? '')));
-        if ($name === '' || !filter_var($email, FILTER_VALIDATE_EMAIL)) {
-            throw new \InvalidArgumentException('Name and a valid email are required.');
-        }
+        $eventId = (string)($input['event_id'] ?? 'evt_001');
+        if ($name === '' || !filter_var($email, FILTER_VALIDATE_EMAIL)) throw new \InvalidArgumentException('Name and a valid email are required.');
         foreach ($rows as $existing) {
-            if (strtolower((string)($existing['email'] ?? '')) === $email) {
-                throw new \InvalidArgumentException('An attendee with this email already exists.');
+            if (($existing['event_id'] ?? '') === $eventId && strtolower((string)($existing['email'] ?? '')) === $email) {
+                throw new \InvalidArgumentException('This email is already registered for the event.');
             }
         }
         $record = [
@@ -42,7 +49,10 @@ final class AttendeeRepository
             'status'=>ApprovalService::normalize((string)($input['status'] ?? 'Pending')),
             'email'=>$email,
             'phone'=>trim((string)($input['phone'] ?? '')),
-            'event_id'=>(string)($input['event_id'] ?? 'evt_001'),
+            'event_id'=>$eventId,
+            'ticket_id'=>(string)($input['ticket_id'] ?? ''),
+            'answers'=>(array)($input['answers'] ?? []),
+            'confirmation_token'=>(string)($input['confirmation_token'] ?? bin2hex(random_bytes(24))),
             'created_at'=>date(DATE_ATOM),
         ];
         array_unshift($rows, $record);
@@ -52,18 +62,14 @@ final class AttendeeRepository
 
     public function update(string $id, array $input): ?array
     {
-        $rows = $this->all();
-        $updated = null;
+        $rows = $this->all(); $updated = null;
         foreach ($rows as &$row) {
             if (($row['id'] ?? '') !== $id) continue;
-            foreach (['name','category','company','email','phone'] as $field) {
-                if (array_key_exists($field, $input)) $row[$field] = trim((string)$input[$field]);
-            }
+            foreach (['name','category','company','email','phone','ticket_id'] as $field) if (array_key_exists($field, $input)) $row[$field] = trim((string)$input[$field]);
             if (isset($input['status'])) $row['status'] = ApprovalService::normalize((string)$input['status']);
             if (isset($input['name'])) $row['initials'] = $this->initials((string)$row['name']);
-            $row['updated_at'] = date(DATE_ATOM);
-            $updated = $row;
-            break;
+            if (isset($input['answers']) && is_array($input['answers'])) $row['answers'] = $input['answers'];
+            $row['updated_at'] = date(DATE_ATOM); $updated = $row; break;
         }
         unset($row);
         if ($updated !== null) $this->store->write('attendees/index.json', $rows);
