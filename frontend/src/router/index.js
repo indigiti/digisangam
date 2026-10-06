@@ -12,6 +12,7 @@ import AttendeesPage from '../pages/AttendeesPage.vue'
 import TicketsPage from '../pages/TicketsPage.vue'
 import CommercePage from '../pages/CommercePage.vue'
 import AnalyticsPage from '../pages/AnalyticsPage.vue'
+import OnGroundPage from '../pages/OnGroundPage.vue'
 import SettingsPage from '../pages/SettingsPage.vue'
 import PlaceholderPage from '../pages/PlaceholderPage.vue'
 
@@ -31,8 +32,8 @@ export default createRouter({
       {path:'tickets',name:'tickets',component:TicketsPage},
       {path:'commerce',name:'commerce',component:CommercePage},
       {path:'analytics',name:'analytics',component:AnalyticsPage},
-      {path:'onground',name:'onground',component:PlaceholderPage,props:{title:'OnGround',description:'Offline-first onsite operations are scheduled for Phase 2.'}},
-      {path:'communication',name:'communication',component:PlaceholderPage,props:{title:'Communication',description:'Campaigns, templates and provider adapters are scheduled for Phase 2.'}},
+      {path:'onground',name:'onground',component:OnGroundPage},
+      {path:'communication',name:'communication',component:PlaceholderPage,props:{title:'Communication',description:'Campaigns and communication dashboards continue in Phase 2; delivery adapters and the notification worker are already operational.'}},
       {path:'settings',name:'settings',component:SettingsPage},
     ]}
   ]
