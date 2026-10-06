@@ -14,9 +14,10 @@ final class ScannerService
         private readonly AttendeeRepository $attendees,
         private readonly OrderRepository $orders,
         private readonly CheckinRepository $checkins,
+        private readonly ?AccessPolicyService $accessPolicy=null,
     ) {}
 
-    public function verify(string $payload): array
+    public function verify(string $payload,string $zoneId=''): array
     {
         $token=$this->tokenFromPayload($payload);
         $credential=$this->credentials->verify($token);
@@ -32,19 +33,29 @@ final class ScannerService
             return ['allowed'=>false,'reason'=>'PAYMENT_NOT_PAID','attendee'=>$this->publicAttendee($attendee)];
         }
 
+        $zone=null;
+        if($this->accessPolicy && $zoneId!==''){
+            $zone=$this->accessPolicy->evaluate((string)$attendee['event_id'],(string)($attendee['category']??''),$zoneId);
+            if(empty($zone['allowed'])) return [
+                'allowed'=>false,'reason'=>$zone['reason']??'ZONE_DENIED',
+                'attendee'=>$this->publicAttendee($attendee),'event_id'=>$attendee['event_id'],'zone'=>$zone['zone']??null,
+            ];
+        }
+
         $existing=$this->checkins->find((string)$attendee['event_id'],(string)$attendee['id']);
         return [
             'allowed'=>true,
             'reason'=>$existing?'ALREADY_CHECKED_IN':'VALID',
             'attendee'=>$this->publicAttendee($attendee),
             'event_id'=>$attendee['event_id'],
+            'zone'=>$zone['zone']??null,
             'checkin'=>$existing,
         ];
     }
 
-    public function checkin(string $payload,string $operatorId=''): array
+    public function checkin(string $payload,string $operatorId='',string $zoneId=''): array
     {
-        $verification=$this->verify($payload);
+        $verification=$this->verify($payload,$zoneId);
         if(empty($verification['allowed'])) return $verification;
         $attendee=$verification['attendee'];
         $result=$this->checkins->checkin((string)$verification['event_id'],(string)$attendee['id'],$operatorId);
