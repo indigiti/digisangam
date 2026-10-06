@@ -101,6 +101,8 @@ export const api={
   updateTicket:(id,payload)=>request('/tickets/'+encodeURIComponent(id),{method:'PATCH',body:JSON.stringify(payload)}),
   orders:(eventId='')=>request('/orders'+(eventId?'?event_id='+encodeURIComponent(eventId):'')),
   createOrder:(payload)=>request('/orders',{method:'POST',body:JSON.stringify(payload)}),
+  captureOrder:(id,payload={})=>request('/orders/'+encodeURIComponent(id)+'/capture',{method:'POST',body:JSON.stringify(payload)}),
+  refundOrder:(id,payload={})=>request('/orders/'+encodeURIComponent(id)+'/refund',{method:'POST',body:JSON.stringify(payload)}),
   workspace:()=>request('/workspace'),
   updateWorkspace:(payload)=>request('/workspace',{method:'PATCH',body:JSON.stringify(payload)}),
   team:()=>request('/team'),
