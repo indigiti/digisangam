@@ -12,15 +12,23 @@ final class WorkspaceRepository
     public function current(): array
     {
         return $this->store->read('workspaces/ws_default.json', [
-            'id'=>'ws_default','name'=>'DigiSangam Workspace','brand'=>'DigiSangam','timezone'=>'Asia/Kolkata',
-            'currency'=>'INR','country'=>'IN','created_at'=>date(DATE_ATOM)
+            'id'=>'ws_default',
+            'name'=>'DigiSangam Workspace',
+            'brand'=>'DigiSangam',
+            'legal_name'=>'',
+            'gstin'=>'',
+            'billing_address'=>'',
+            'timezone'=>'Asia/Kolkata',
+            'currency'=>'INR',
+            'country'=>'IN',
+            'created_at'=>date(DATE_ATOM)
         ]);
     }
 
     public function update(array $input): array
     {
         $current = $this->current();
-        foreach (['name','brand','timezone','currency','country'] as $key) {
+        foreach (['name','brand','legal_name','gstin','billing_address','timezone','currency','country'] as $key) {
             if (array_key_exists($key, $input)) $current[$key] = trim((string)$input[$key]);
         }
         $current['updated_at'] = date(DATE_ATOM);
