@@ -678,8 +678,9 @@ try {
     }
     if($method==='POST' && $path==='/campaigns'){
         $auth->requirePermission('communications.manage');
-        $record=$campaigns->create($body());
-        $journal->append('campaign.created',['campaign_id'=>$record['id']]);
+        $input=$body();$requireEvent((string)($input['event_id']??''));
+        $record=$campaigns->create($input);
+        $journal->append('campaign.created',['campaign_id'=>$record['id'],'event_id'=>$record['event_id']]);
         JsonResponse::send($record,201);
     }
     if(preg_match('#^/campaigns/([^/]+)$#',$path,$m) && in_array($method,['PUT','PATCH'],true)){
@@ -703,8 +704,9 @@ try {
     }
     if($method==='POST' && $path==='/automations'){
         $auth->requirePermission('automation.manage');
-        $record=$workflows->create($body());
-        $journal->append('automation.created',['workflow_id'=>$record['id']]);
+        $input=$body();$requireEvent((string)($input['event_id']??''));
+        $record=$workflows->create($input);
+        $journal->append('automation.created',['workflow_id'=>$record['id'],'event_id'=>$record['event_id']]);
         JsonResponse::send($record,201);
     }
     if(preg_match('#^/automations/([^/]+)$#',$path,$m) && in_array($method,['PUT','PATCH'],true)){
@@ -730,7 +732,8 @@ try {
     }
     if($method==='POST' && $path==='/badges'){
         $auth->requirePermission('badges.manage');
-        JsonResponse::send($badges->create($body()),201);
+        $input=$body();$requireEvent((string)($input['event_id']??''));
+        JsonResponse::send($badges->create($input),201);
     }
     if(preg_match('#^/badges/([^/]+)$#',$path,$m) && in_array($method,['PUT','PATCH'],true)){
         $auth->requirePermission('badges.manage');
@@ -746,7 +749,8 @@ try {
     }
     if($method==='POST' && $path==='/sessions'){
         $auth->requirePermission('agenda.manage');
-        JsonResponse::send($sessions->create($body()),201);
+        $input=$body();$requireEvent((string)($input['event_id']??''));
+        JsonResponse::send($sessions->create($input),201);
     }
     if(preg_match('#^/sessions/([^/]+)$#',$path,$m) && in_array($method,['PUT','PATCH'],true)){
         $auth->requirePermission('agenda.manage');
@@ -789,7 +793,8 @@ try {
     }
     if($method==='POST' && $path==='/exhibitors'){
         $auth->requirePermission('exhibitors.manage');
-        JsonResponse::send($exhibitors->create($body()),201);
+        $input=$body();$requireEvent((string)($input['event_id']??''));
+        JsonResponse::send($exhibitors->create($input),201);
     }
     if(preg_match('#^/exhibitors/([^/]+)$#',$path,$m) && in_array($method,['PUT','PATCH'],true)){
         $auth->requirePermission('exhibitors.manage');
@@ -804,8 +809,14 @@ try {
     }
     if($method==='POST' && $path==='/leads'){
         $auth->requirePermission('exhibitors.manage');
-        $record=(new LeadRepository($store))->create($body());
-        $journal->append('lead.captured',['lead_id'=>$record['id'],'exhibitor_id'=>$record['exhibitor_id']]);
+        $input=$body();$event=$requireEvent((string)($input['event_id']??''));
+        $exhibitor=null;
+        foreach($exhibitors->all() as $row) if(($row['id']??'')===($input['exhibitor_id']??'')){$exhibitor=$row;break;}
+        $attendee=(new AttendeeRepository($store))->find((string)($input['attendee_id']??''));
+        if(!$exhibitor||($exhibitor['event_id']??'')!==$event['id']) throw new InvalidArgumentException('Exhibitor does not belong to this event.');
+        if(!$attendee||($attendee['event_id']??'')!==$event['id']) throw new InvalidArgumentException('Attendee does not belong to this event.');
+        $record=(new LeadRepository($store))->create($input);
+        $journal->append('lead.captured',['lead_id'=>$record['id'],'exhibitor_id'=>$record['exhibitor_id'],'event_id'=>$record['event_id']]);
         JsonResponse::send($record,201);
     }
     if($method==='GET' && $path==='/meetings'){
@@ -814,8 +825,14 @@ try {
     }
     if($method==='POST' && $path==='/meetings'){
         $auth->requirePermission('exhibitors.manage');
-        $record=(new MeetingRepository($store))->create($body());
-        $journal->append('meeting.booked',['meeting_id'=>$record['id'],'exhibitor_id'=>$record['exhibitor_id']]);
+        $input=$body();$event=$requireEvent((string)($input['event_id']??''));
+        $exhibitor=null;
+        foreach($exhibitors->all() as $row) if(($row['id']??'')===($input['exhibitor_id']??'')){$exhibitor=$row;break;}
+        $attendee=(new AttendeeRepository($store))->find((string)($input['attendee_id']??''));
+        if(!$exhibitor||($exhibitor['event_id']??'')!==$event['id']) throw new InvalidArgumentException('Exhibitor does not belong to this event.');
+        if(!$attendee||($attendee['event_id']??'')!==$event['id']) throw new InvalidArgumentException('Attendee does not belong to this event.');
+        $record=(new MeetingRepository($store))->create($input);
+        $journal->append('meeting.booked',['meeting_id'=>$record['id'],'exhibitor_id'=>$record['exhibitor_id'],'event_id'=>$record['event_id']]);
         JsonResponse::send($record,201);
     }
     if(preg_match('#^/meetings/([^/]+)$#',$path,$m) && in_array($method,['PUT','PATCH'],true)){
@@ -831,8 +848,14 @@ try {
     }
     if($method==='POST' && $path==='/badge-prints'){
         $auth->requirePermission('badges.manage');
-        $record=(new PrintJobRepository($store))->create($body());
-        $journal->append('badge.print_queued',['print_job_id'=>$record['id'],'attendee_id'=>$record['attendee_id']]);
+        $input=$body();$event=$requireEvent((string)($input['event_id']??''));
+        $attendee=(new AttendeeRepository($store))->find((string)($input['attendee_id']??''));
+        $template=null;
+        foreach($badges->all() as $row) if(($row['id']??'')===($input['template_id']??'')){$template=$row;break;}
+        if(!$attendee||($attendee['event_id']??'')!==$event['id']) throw new InvalidArgumentException('Attendee does not belong to this event.');
+        if(!$template||($template['event_id']??'')!==$event['id']) throw new InvalidArgumentException('Badge template does not belong to this event.');
+        $record=(new PrintJobRepository($store))->create($input);
+        $journal->append('badge.print_queued',['print_job_id'=>$record['id'],'attendee_id'=>$record['attendee_id'],'event_id'=>$record['event_id']]);
         JsonResponse::send($record,201);
     }
     if(preg_match('#^/badge-prints/([^/]+)$#',$path,$m) && in_array($method,['PUT','PATCH'],true)){
@@ -848,6 +871,7 @@ try {
     }
     if(in_array($method,['PUT','PATCH'],true) && preg_match('#^/venue/([^/]+)$#',$path,$m)){
         $auth->requirePermission('venue.manage');
+        $requireEvent($m[1]);
         $record=(new VenueRepository($store))->save($m[1],$body());
         $journal->append('venue.updated',['event_id'=>$m[1]]);
         JsonResponse::send($record);
@@ -859,7 +883,13 @@ try {
     }
     if($method==='POST' && preg_match('#^/venue/([^/]+)/seats$#',$path,$m)){
         $auth->requirePermission('venue.manage');
-        $record=(new SeatAssignmentRepository($store))->assign($m[1],$body());
+        $event=$requireEvent($m[1]);$input=$body();
+        $attendee=(new AttendeeRepository($store))->find((string)($input['attendee_id']??''));
+        if(!$attendee||($attendee['event_id']??'')!==$event['id']) throw new InvalidArgumentException('Attendee does not belong to this event.');
+        $venue=(new VenueRepository($store))->get($event['id']);$hall=null;
+        foreach((array)($venue['seating']??[]) as $row) if(($row['id']??'')===($input['hall_id']??'')){$hall=$row;break;}
+        if(!$hall||($hall['type']??'')!=='reserved') throw new InvalidArgumentException('Reserved seating hall not found for this event.');
+        $record=(new SeatAssignmentRepository($store))->assign($m[1],$input);
         $journal->append('seat.assigned',['event_id'=>$m[1],'attendee_id'=>$record['attendee_id'],'seat'=>$record['seat']]);
         JsonResponse::send($record,201);
     }
@@ -867,6 +897,7 @@ try {
     // Phase 2 — signed offline package for OnGround clients
     if($method==='GET' && preg_match('#^/onground/snapshot/([^/]+)$#',$path,$m)){
         $auth->requirePermission('onground.view');
+        $requireEvent($m[1]);
         JsonResponse::send((new OfflineSnapshotService(
             new AttendeeRepository($store),
             new TicketRepository($store),
