@@ -14,6 +14,11 @@ use DigiSangam\Core\Storage\JsonFileStore;
 use DigiSangam\Credentials\CredentialService;
 use DigiSangam\Events\EventRepository;
 use DigiSangam\Invitations\InvitationRepository;
+use DigiSangam\Notifications\NotificationOutbox;
+use DigiSangam\Payments\PaymentService;
+use DigiSangam\PublicFlow\PublicRequestGuard;
+use DigiSangam\PublicFlow\RateLimitException;
+use DigiSangam\PublicFlow\RegistrationCheckoutService;
 use DigiSangam\Registration\RegistrationRepository;
 use DigiSangam\Tickets\TicketRepository;
 use DigiSangam\Workspace\WorkspaceRepository;
@@ -40,6 +45,20 @@ $credentialSecret = static function () use ($store): string {
     $secret = bin2hex(random_bytes(32));
     $store->write('secrets/credential.json', ['secret'=>$secret,'created_at'=>date(DATE_ATOM)]);
     return $secret;
+};
+
+$publicFlow = static function () use ($store,$credentialSecret): RegistrationCheckoutService {
+    return new RegistrationCheckoutService(
+        new EventRepository($store),
+        new RegistrationRepository($store),
+        new InvitationRepository($store),
+        new TicketRepository($store),
+        new AttendeeRepository($store),
+        new OrderRepository($store),
+        new NotificationOutbox($store),
+        new CredentialService($credentialSecret()),
+        new PaymentService(),
+    );
 };
 
 try {
@@ -73,6 +92,35 @@ try {
         $journal->append('auth.logout', ['user_id'=>$user['id']]);
         $auth->logout();
         JsonResponse::send(['ok'=>true]);
+    }
+
+    // Public attendee-facing API. These routes intentionally do not require an admin session.
+    if (str_starts_with($path, '/public/')) {
+        if ($auth->setupRequired()) {
+            JsonResponse::send(['error'=>'Event platform setup is not complete.'],503);
+        }
+
+        if ($method === 'GET' && preg_match('#^/public/events/([^/]+)$#',$path,$m)) {
+            JsonResponse::send($publicFlow()->publicEvent($m[1]));
+        }
+
+        if ($method === 'POST' && preg_match('#^/public/events/([^/]+)/register$#',$path,$m)) {
+            (new PublicRequestGuard($store))->enforce('register:' . $m[1], 12, 600);
+            $result=$publicFlow()->register($m[1],$body());
+            $journal->append('public.registration_created',[
+                'event_id'=>$m[1],
+                'attendee_id'=>$result['attendee']['id'] ?? null,
+                'ticket_id'=>$result['ticket']['id'] ?? null,
+                'order_id'=>$result['order']['id'] ?? null,
+            ]);
+            JsonResponse::send($result,201);
+        }
+
+        if ($method === 'GET' && preg_match('#^/public/confirmations/([a-f0-9]{32,})$#',$path,$m)) {
+            JsonResponse::send($publicFlow()->confirmation($m[1]));
+        }
+
+        JsonResponse::send(['error'=>'Public endpoint not found.'],404);
     }
 
     if ($auth->setupRequired()) {
@@ -246,6 +294,8 @@ try {
     JsonResponse::send(['error'=>$e->getMessage(),'code'=>'AUTH_REQUIRED'],401);
 } catch (AuthorizationException $e) {
     JsonResponse::send(['error'=>$e->getMessage(),'code'=>'FORBIDDEN'],403);
+} catch (RateLimitException $e) {
+    JsonResponse::send(['error'=>$e->getMessage(),'code'=>'RATE_LIMITED'],429);
 } catch (InvalidArgumentException $e) {
     JsonResponse::send(['error'=>$e->getMessage()],422);
 } catch (RuntimeException $e) {
