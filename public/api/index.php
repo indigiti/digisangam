@@ -746,9 +746,12 @@ try {
     if($method==='POST' && $path==='/automations/fire'){
         $auth->requirePermission('automation.manage');
         $input=$body();
+        $context=(array)($input['context']??[]);
+        $requireEvent((string)($context['event_id']??''));
         JsonResponse::send((new WorkflowEngine($workflows,new NotificationOutbox($store)))->fire(
             (string)($input['trigger']??''),
-            (array)($input['context']??[])
+            $context,
+            (bool)($input['dry_run']??false)
         ));
     }
 
