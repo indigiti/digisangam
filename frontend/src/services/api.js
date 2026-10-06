@@ -1,7 +1,9 @@
 import * as demo from '../data/demo'
 import { useAuthStore } from '../stores/auth'
 
-const apiBase=(import.meta.env.BASE_URL||'/').replace(/\/$/,'')+'/api/v1'\n\nconst fallback={'/dashboard':demo.dashboard,'/events':demo.events,'/attendees':demo.attendees,'/tickets':demo.tickets}
+const apiBase=(import.meta.env.BASE_URL||'/').replace(/\/$/,'')+'/api/v1'
+
+const fallback={'/dashboard':demo.dashboard,'/events':demo.events,'/attendees':demo.attendees,'/tickets':demo.tickets}
 
 async function parseResponse(response){
   const text=await response.text()
