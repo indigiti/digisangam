@@ -3,6 +3,7 @@ import { onMounted, ref } from 'vue'
 import { useRoute } from 'vue-router'
 import { api } from '../services/api'
 import QrCredential from '../components/QrCredential.vue'
+import PublicConcierge from '../components/PublicConcierge.vue'
 const route=useRoute(),data=ref(null),loading=ref(true),error=ref('')
 const money=(n,currency='INR')=>new Intl.NumberFormat('en-IN',{style:'currency',currency,maximumFractionDigits:0}).format(Number(n||0))
 onMounted(async()=>{try{data.value=await api.publicConfirmation(route.params.token)}catch(e){error.value=e.message}finally{loading.value=false}})
@@ -26,6 +27,8 @@ function printDocument(){window.print()}
           <div v-if="data.credential"><p class="mb-3 text-center text-xs font-black uppercase tracking-widest text-slate-400">Entry QR</p><QrCredential :value="data.credential.payload"/><p class="mt-3 text-center text-xs leading-5 text-slate-400">Present this QR at event check-in.</p></div>
         </div>
       </section>
+
+      <PublicConcierge :token="route.params.token" />
 
       <section v-if="data.receipt" class="print-card mt-5 rounded-[24px] border border-slate-200 bg-white p-7 shadow-sm sm:p-9">
         <div class="flex flex-col justify-between gap-4 sm:flex-row"><div><p class="text-xs font-black uppercase tracking-widest text-slate-400">Payment receipt</p><h2 class="mt-2 text-xl font-black">{{data.receipt.receipt_number}}</h2><p class="mt-1 text-xs text-slate-400">{{data.receipt.issued_at}}</p></div><div class="sm:text-right"><b>{{data.receipt.seller.name}}</b><p v-if="data.receipt.seller.gstin" class="mt-1 text-xs text-slate-500">GSTIN {{data.receipt.seller.gstin}}</p><p v-if="data.receipt.seller.address" class="mt-1 max-w-sm whitespace-pre-line text-xs text-slate-500">{{data.receipt.seller.address}}</p></div></div>
