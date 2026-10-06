@@ -12,11 +12,7 @@ async function parseResponse(response){
 }
 
 async function publicRequest(path,options={}){
-  const response=await fetch('/api/v1'+path,{
-    credentials:'same-origin',
-    headers:{'Content-Type':'application/json',...(options.headers||{})},
-    ...options,
-  })
+  const response=await fetch('/api/v1'+path,{credentials:'same-origin',headers:{'Content-Type':'application/json',...(options.headers||{})},...options})
   return parseResponse(response)
 }
 
@@ -60,6 +56,27 @@ export const api={
   credential:(id)=>request('/attendees/'+encodeURIComponent(id)+'/credential'),
   scannerVerify:(payload)=>request('/scanner/verify',{method:'POST',body:JSON.stringify({payload})}),
   scannerCheckin:(payload)=>request('/scanner/checkin',{method:'POST',body:JSON.stringify({payload})}),
+  ongroundSnapshot:(eventId)=>request('/onground/snapshot/'+encodeURIComponent(eventId)),
+  ongroundSync:(items)=>request('/onground/sync',{method:'POST',body:JSON.stringify({items})}),
+  campaigns:()=>request('/campaigns'),
+  createCampaign:(payload)=>request('/campaigns',{method:'POST',body:JSON.stringify(payload)}),
+  updateCampaign:(id,payload)=>request('/campaigns/'+encodeURIComponent(id),{method:'PATCH',body:JSON.stringify(payload)}),
+  dispatchCampaign:(id)=>request('/campaigns/'+encodeURIComponent(id)+'/dispatch',{method:'POST',body:'{}'}),
+  automations:()=>request('/automations'),
+  createAutomation:(payload)=>request('/automations',{method:'POST',body:JSON.stringify(payload)}),
+  updateAutomation:(id,payload)=>request('/automations/'+encodeURIComponent(id),{method:'PATCH',body:JSON.stringify(payload)}),
+  fireAutomation:(payload)=>request('/automations/fire',{method:'POST',body:JSON.stringify(payload)}),
+  badges:()=>request('/badges'),
+  createBadge:(payload)=>request('/badges',{method:'POST',body:JSON.stringify(payload)}),
+  updateBadge:(id,payload)=>request('/badges/'+encodeURIComponent(id),{method:'PATCH',body:JSON.stringify(payload)}),
+  sessions:()=>request('/sessions'),
+  createSession:(payload)=>request('/sessions',{method:'POST',body:JSON.stringify(payload)}),
+  updateSession:(id,payload)=>request('/sessions/'+encodeURIComponent(id),{method:'PATCH',body:JSON.stringify(payload)}),
+  exhibitors:()=>request('/exhibitors'),
+  createExhibitor:(payload)=>request('/exhibitors',{method:'POST',body:JSON.stringify(payload)}),
+  updateExhibitor:(id,payload)=>request('/exhibitors/'+encodeURIComponent(id),{method:'PATCH',body:JSON.stringify(payload)}),
+  venue:(eventId)=>request('/venue/'+encodeURIComponent(eventId)),
+  updateVenue:(eventId,payload)=>request('/venue/'+encodeURIComponent(eventId),{method:'PATCH',body:JSON.stringify(payload)}),
   tickets:()=>request('/tickets'),
   createTicket:(payload)=>request('/tickets',{method:'POST',body:JSON.stringify(payload)}),
   updateTicket:(id,payload)=>request('/tickets/'+encodeURIComponent(id),{method:'PATCH',body:JSON.stringify(payload)}),
