@@ -29,8 +29,9 @@ final class SessionRepository
             'status'=>(string)($input['status']??'published'),
             'created_at'=>date(DATE_ATOM),
         ];
-        if(($record['event_id']??'')==='') throw new \InvalidArgumentException('Event is required.');
-        if(($record['event_id']??'')==='') throw new \InvalidArgumentException('Event is required.');
+        if($record['event_id']==='') throw new \InvalidArgumentException('Event is required.');
+        if($record['title']==='') throw new \InvalidArgumentException('Session title is required.');
+        if($record['start_at']!=='' && $record['end_at']!=='' && $record['end_at']<=$record['start_at']) throw new \InvalidArgumentException('Session end time must be after start time.');
         $rows=$this->all(); array_unshift($rows,$record);
         $this->store->write('agenda/sessions.json',$rows);
         return $record;
@@ -50,11 +51,4 @@ final class SessionRepository
         return $updated;
     }
 
-    private static function defaults(): array
-    {
-        return [
-            ['id'=>'ses_open','event_id'=>'evt_001','title'=>'Opening Keynote','track'=>'Main','room'=>'Grand Ballroom','start_at'=>'2026-10-12T10:00','end_at'=>'2026-10-12T11:00','capacity'=>800,'speakers'=>['Keynote Speaker'],'status'=>'published'],
-            ['id'=>'ses_ai','event_id'=>'evt_001','title'=>'AI, Commerce & Experiences','track'=>'Innovation','room'=>'Hall A','start_at'=>'2026-10-12T11:30','end_at'=>'2026-10-12T12:15','capacity'=>250,'speakers'=>['Panel'],'status'=>'published'],
-        ];
-    }
 }
