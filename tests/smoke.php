@@ -9,6 +9,10 @@ use DigiSangam\Commerce\OrderRepository;
 use DigiSangam\Exhibitors\LeadRepository;
 use DigiSangam\Exhibitors\MeetingRepository;
 use DigiSangam\OnGround\AccessPolicyService;
+use DigiSangam\OnGround\AccessEventRepository;
+use DigiSangam\Intelligence\EventGraphBuilder;
+use DigiSangam\Intelligence\IntelligenceClient;
+use DigiSangam\Intelligence\LocalIntelligenceEngine;
 use DigiSangam\Venue\SeatAssignmentRepository;
 use DigiSangam\Attendees\AttendeeRepository;
 use DigiSangam\Automation\WorkflowEngine;
@@ -142,7 +146,34 @@ try{
     $print=(new PrintJobRepository($store))->create(['event_id'=>'evt_001','attendee_id'=>'TKT_A','template_id'=>'bdg_default']);
     expect(($print['status']??'')==='queued','Badge print queue failed.');
 
-    fwrite(STDOUT,"DigiSangam Phase 1 + Phase 2 smoke tests passed.\n");
+    // Phase 3: zone movement feeds the Event Graph and Digital Twin occupancy.
+    $accessEvents=new AccessEventRepository($store);
+    $accessEvent=$accessEvents->enter('evt_001','TKT_A','zone_vip','usr_test');
+    expect(($accessEvent['duplicate']??true)===false,'Zone access event was not recorded.');
+    expect(($accessEvents->currentOccupancy('evt_001')['zone_vip']??0)===1,'Zone occupancy did not track latest attendee location.');
+
+    $graph=(new EventGraphBuilder($store))->build('evt_001');
+    expect(($graph['metrics']['registrations']??0)===2,'Event Graph registration metric is incorrect.');
+    expect(($graph['metrics']['zone_occupancy']['zone_vip']??0)===1,'Event Graph zone occupancy is incorrect.');
+    expect(($graph['metrics']['leads']??0)===1,'Event Graph lead metric is incorrect.');
+    expect(($graph['metrics']['meetings']??0)===1,'Event Graph meeting metric is incorrect.');
+
+    // Phase 3: local intelligence remains functional without Python.
+    $local=new LocalIntelligenceEngine();
+    $analysis=$local->analyze($graph);
+    expect(isset($analysis['forecast']['registrations_7d']),'Registration forecast missing.');
+    expect(($analysis['lead_scores'][0]['ai_band']??'')==='hot','AI lead scoring did not rank the hot lead.');
+    expect(count($analysis['crowd']??[])>=1,'Digital Twin crowd analysis missing.');
+    $copilot=$local->copilot('How are registrations doing?',$graph);
+    expect(str_contains(strtolower((string)($copilot['answer']??'')),'registration'),'Organizer Copilot did not answer from graph metrics.');
+    $concierge=$local->concierge('What sessions should I attend?','TKT_A',$graph);
+    expect(str_contains((string)($concierge['answer']??''),'Opening Keynote'),'Attendee Concierge recommendation failed.');
+
+    // Phase 3: remote client falls back locally when no service URL is configured.
+    $fallback=(new IntelligenceClient())->analyze($graph);
+    expect(($fallback['engine']??'')==='php_fallback','Intelligence client fallback did not activate.');
+
+    fwrite(STDOUT,"DigiSangam Phase 1 + Phase 2 + Phase 3 smoke tests passed.\n");
 }finally{
     $iterator=new RecursiveIteratorIterator(new RecursiveDirectoryIterator($root,FilesystemIterator::SKIP_DOTS),RecursiveIteratorIterator::CHILD_FIRST);
     foreach($iterator as $item) $item->isDir()?rmdir($item->getPathname()):unlink($item->getPathname());
