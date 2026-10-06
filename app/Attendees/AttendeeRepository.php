@@ -42,7 +42,7 @@ final class AttendeeRepository
         $rows = $this->all();
         $name = trim((string)($input['name'] ?? ''));
         $email = strtolower(trim((string)($input['email'] ?? '')));
-        $eventId = (string)($input['event_id'] ?? 'evt_001');
+        $eventId = trim((string)($input['event_id'] ?? ''));
         if ($name === '' || !filter_var($email, FILTER_VALIDATE_EMAIL)) throw new \InvalidArgumentException('Name and a valid email are required.');
         foreach ($rows as $existing) {
             if (($existing['event_id'] ?? '') === $eventId && strtolower((string)($existing['email'] ?? '')) === $email) {
@@ -64,6 +64,7 @@ final class AttendeeRepository
             'confirmation_token'=>(string)($input['confirmation_token'] ?? bin2hex(random_bytes(24))),
             'created_at'=>date(DATE_ATOM),
         ];
+        if(($record['event_id']??'')==='') throw new \InvalidArgumentException('Event is required.');
         array_unshift($rows, $record);
         $this->store->write('attendees/index.json', $rows);
         return $record;
