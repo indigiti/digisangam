@@ -11,6 +11,8 @@ use DigiSangam\Exhibitors\MeetingRepository;
 use DigiSangam\OnGround\AccessPolicyService;
 use DigiSangam\OnGround\AccessEventRepository;
 use DigiSangam\Intelligence\EventGraphBuilder;
+use DigiSangam\Intelligence\ActionProposalRepository;
+use DigiSangam\Intelligence\ApprovedActionService;
 use DigiSangam\Intelligence\IntelligenceClient;
 use DigiSangam\Intelligence\LocalIntelligenceEngine;
 use DigiSangam\Venue\SeatAssignmentRepository;
@@ -172,6 +174,22 @@ try{
     // Phase 3: remote client falls back locally when no service URL is configured.
     $fallback=(new IntelligenceClient())->analyze($graph);
     expect(($fallback['engine']??'')==='php_fallback','Intelligence client fallback did not activate.');
+
+    // Phase 3: AI action governance blocks execution until explicit approval.
+    $proposalRepo=new ActionProposalRepository($store);
+    $proposal=$proposalRepo->create([
+        'event_id'=>'evt_001',
+        'type'=>'campaign_draft',
+        'title'=>'AI draft campaign',
+        'payload'=>['channel'=>'email','subject'=>'Draft','content'=>'Prepared by intelligence','segment'=>['status'=>'Confirmed']],
+    ],'usr_ai');
+    $blocked=false;
+    try{(new ApprovedActionService($store))->execute($proposal);}catch(RuntimeException){$blocked=true;}
+    expect($blocked,'Unapproved AI action was allowed to execute.');
+    $approved=$proposalRepo->decide($proposal['id'],'approved','usr_manager');
+    expect(($approved['status']??'')==='approved','AI action approval was not recorded.');
+    $executed=(new ApprovedActionService($store))->execute($approved);
+    expect(($executed['type']??'')==='campaign_draft','Approved AI action did not create the safe draft.');
 
     fwrite(STDOUT,"DigiSangam Phase 1 + Phase 2 + Phase 3 smoke tests passed.\n");
 }finally{
