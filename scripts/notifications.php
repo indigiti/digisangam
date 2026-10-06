@@ -2,6 +2,7 @@
 declare(strict_types=1);
 
 use DigiSangam\Core\Storage\JsonFileStore;
+use DigiSangam\Communications\CampaignRepository;
 use DigiSangam\Notifications\NotificationOutbox;
 use DigiSangam\Notifications\NotificationProviderFactory;
 use DigiSangam\Notifications\NotificationTemplateRenderer;
@@ -15,6 +16,7 @@ $worker=new NotificationWorker(
     new NotificationTemplateRenderer(),
     NotificationProviderFactory::email(),
     NotificationProviderFactory::whatsapp(),
+    new CampaignRepository($store),
 );
 $result=$worker->run((int)($argv[1]??25));
 fwrite(STDOUT,json_encode($result,JSON_PRETTY_PRINT|JSON_UNESCAPED_SLASHES).PHP_EOL);
