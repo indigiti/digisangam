@@ -9,6 +9,9 @@ use DigiSangam\Badges\BadgeTemplateRepository;
 use DigiSangam\Communications\CampaignDispatchService;
 use DigiSangam\Communications\CampaignRepository;
 use DigiSangam\Exhibitors\ExhibitorRepository;
+use DigiSangam\Exhibitors\LeadRepository;
+use DigiSangam\Exhibitors\MeetingRepository;
+use DigiSangam\Badges\PrintJobRepository;
 use DigiSangam\OnGround\OfflineSnapshotService;
 use DigiSangam\OnGround\AccessPolicyService;
 use DigiSangam\Venue\VenueRepository;
@@ -525,6 +528,50 @@ try {
         $auth->requirePermission('exhibitors.manage');
         $record=$exhibitors->update($m[1],$body());
         JsonResponse::send($record??['error'=>'Exhibitor not found.'],$record?200:404);
+    }
+
+    // Phase 2 — Exhibitor leads and meetings
+    if($method==='GET' && $path==='/leads'){
+        $auth->requirePermission('exhibitors.view');
+        JsonResponse::send((new LeadRepository($store))->all());
+    }
+    if($method==='POST' && $path==='/leads'){
+        $auth->requirePermission('exhibitors.manage');
+        $record=(new LeadRepository($store))->create($body());
+        $journal->append('lead.captured',['lead_id'=>$record['id'],'exhibitor_id'=>$record['exhibitor_id']]);
+        JsonResponse::send($record,201);
+    }
+    if($method==='GET' && $path==='/meetings'){
+        $auth->requirePermission('exhibitors.view');
+        JsonResponse::send((new MeetingRepository($store))->all());
+    }
+    if($method==='POST' && $path==='/meetings'){
+        $auth->requirePermission('exhibitors.manage');
+        $record=(new MeetingRepository($store))->create($body());
+        $journal->append('meeting.booked',['meeting_id'=>$record['id'],'exhibitor_id'=>$record['exhibitor_id']]);
+        JsonResponse::send($record,201);
+    }
+    if(preg_match('#^/meetings/([^/]+)$#',$path,$m) && in_array($method,['PUT','PATCH'],true)){
+        $auth->requirePermission('exhibitors.manage');
+        $record=(new MeetingRepository($store))->update($m[1],$body());
+        JsonResponse::send($record??['error'=>'Meeting not found.'],$record?200:404);
+    }
+
+    // Phase 2 — Badge print queue
+    if($method==='GET' && $path==='/badge-prints'){
+        $auth->requirePermission('badges.view');
+        JsonResponse::send((new PrintJobRepository($store))->all());
+    }
+    if($method==='POST' && $path==='/badge-prints'){
+        $auth->requirePermission('badges.manage');
+        $record=(new PrintJobRepository($store))->create($body());
+        $journal->append('badge.print_queued',['print_job_id'=>$record['id'],'attendee_id'=>$record['attendee_id']]);
+        JsonResponse::send($record,201);
+    }
+    if(preg_match('#^/badge-prints/([^/]+)$#',$path,$m) && in_array($method,['PUT','PATCH'],true)){
+        $auth->requirePermission('badges.manage');
+        $record=(new PrintJobRepository($store))->update($m[1],$body());
+        JsonResponse::send($record??['error'=>'Print job not found.'],$record?200:404);
     }
 
     // Phase 2 — Venue, zones and seating
