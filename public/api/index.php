@@ -51,6 +51,16 @@ use DigiSangam\PublicFlow\RegistrationCheckoutService;
 use DigiSangam\Registration\RegistrationRepository;
 use DigiSangam\Tickets\TicketRepository;
 use DigiSangam\Workspace\WorkspaceRepository;
+use DigiSangam\Accreditation\AccreditationRepository;
+use DigiSangam\Credentials\CredentialBindingRepository;
+use DigiSangam\Developer\ApiKeyRepository;
+use DigiSangam\Developer\WebhookRepository;
+use DigiSangam\Intelligence\EventBlueprintService;
+use DigiSangam\Media\MediaRepository;
+use DigiSangam\OnGround\WalkInRegistrationService;
+use DigiSangam\Reports\OperationalReportService;
+use DigiSangam\Wallet\WalletPassRepository;
+use DigiSangam\Wallet\WalletPassService;
 
 $privateRoot=trim((string)getenv('DIGISANGAM_PRIVATE_ROOT'));
 $bootstrapCandidates=array_values(array_filter([
@@ -168,6 +178,7 @@ $scanner = static function () use ($store,$credentialSecret): ScannerService {
         new CheckinRepository($store),
         new AccessPolicyService(new VenueRepository($store)),
         new AccessEventRepository($store),
+        new CredentialBindingRepository($store),
     );
 };
 
@@ -329,7 +340,53 @@ try {
             JsonResponse::send($intelligence()->concierge($question,(string)$attendee['id'],$graph));
         }
 
+        if ($method === 'GET' && preg_match('#^/public/media/([^/]+)$#',$path,$m)) {
+            $media=(new MediaRepository($store))->stream($m[1]);
+            if(empty($media['public'])) JsonResponse::send(['error'=>'Media not found.'],404);
+            header('Content-Type: '.(string)$media['mime']);
+            header('Content-Length: '.(string)$media['size']);
+            header('Cache-Control: public, max-age=86400');
+            readfile((string)$media['path']);
+            exit;
+        }
+
+        if ($method === 'POST' && preg_match('#^/public/events/([^/]+)/media$#',$path,$m)) {
+            (new PublicRequestGuard($store))->enforce('media-upload:'.$m[1],20,600);
+            $publicFlow()->publicEvent($m[1]);
+            if(empty($_FILES['file'])) JsonResponse::send(['error'=>'File is required.'],422);
+            $record=(new MediaRepository($store))->saveUpload($_FILES['file'],$m[1],(string)($_POST['kind']??'registration_file'),false);
+            JsonResponse::send($record,201);
+        }
+
+        if ($method === 'POST' && preg_match('#^/public/confirmations/([a-f0-9]{32,})/wallet$#',$path,$m)) {
+            (new PublicRequestGuard($store))->enforce('wallet:'.$m[1],20,600);
+            $attendee=(new AttendeeRepository($store))->findByConfirmationToken($m[1]);
+            if(!$attendee) JsonResponse::send(['error'=>'Registration not found.'],404);
+            if(($attendee['status']??'')!=='Confirmed') JsonResponse::send(['error'=>'Wallet pass is available after confirmation.'],422);
+            $event=(new EventRepository($store))->find((string)$attendee['event_id']);
+            if(!$event) JsonResponse::send(['error'=>'Event not found.'],404);
+            $input=$body();
+            $credential=(new CredentialService($credentialSecret()))->issue((string)$attendee['id'],(string)$attendee['event_id']);
+            $pass=(new WalletPassService(new WalletPassRepository($store),$credentialSecret()))->issue($event,$attendee,(string)$credential['payload'],(string)($input['platform']??'google'));
+            JsonResponse::send($pass,201);
+        }
+
         JsonResponse::send(['error'=>'Public endpoint not found.'],404);
+    }
+
+    if (str_starts_with($path,'/developer/v1/')) {
+        $key=(string)($_SERVER['HTTP_X_DIGISANGAM_KEY']??'');
+        if($key==='') JsonResponse::send(['error'=>'Developer API key is required.'],401);
+        if(!preg_match('#^/developer/v1/events/([^/]+)(?:/(attendees|sessions|analytics))?$#',$path,$m)) JsonResponse::send(['error'=>'Developer endpoint not found.'],404);
+        $eventId=$m[1];$resource=$m[2]??'event';
+        $scope=match($resource){'attendees'=>'attendees.read','sessions'=>'sessions.read','analytics'=>'analytics.read',default=>'events.read'};
+        $authorized=(new ApiKeyRepository($store))->authenticate($key,$scope,$eventId);
+        if(!$authorized) JsonResponse::send(['error'=>'Invalid API key or scope.'],403);
+        $requireEvent($eventId);
+        if($resource==='attendees') JsonResponse::send($forEvent((new AttendeeRepository($store))->all(),$eventId));
+        if($resource==='sessions') JsonResponse::send($forEvent((new SessionRepository($store))->all(),$eventId));
+        if($resource==='analytics') JsonResponse::send((new AnalyticsService($store))->dashboard($eventId));
+        JsonResponse::send($eventView((new EventRepository($store))->find($eventId)));
     }
 
     if ($auth->setupRequired()) {
@@ -397,6 +454,100 @@ try {
         if(!$user) JsonResponse::send(['error'=>'User not found.'],404);
         $journal->append('team.user_updated',['user_id'=>$user['id'],'role'=>$user['role'],'active'=>$user['active']??true,'actor_id'=>$actor['id']]);
         JsonResponse::send($user);
+    }
+
+    // Remaining roadmap modules
+    if ($method === 'GET' && $path === '/accreditation') {
+        $auth->requirePermission('accreditation.view');
+        JsonResponse::send($forEvent((new AccreditationRepository($store))->all(),$eventQuery));
+    }
+    if ($method === 'POST' && $path === '/accreditation') {
+        $actor=$auth->requirePermission('accreditation.manage');$input=$body();$eventId=(string)($input['event_id']??'');$requireEvent($eventId);
+        $attendee=(new AttendeeRepository($store))->find((string)($input['attendee_id']??''));
+        if(!$attendee||($attendee['event_id']??'')!==$eventId) JsonResponse::send(['error'=>'Attendee does not belong to this event.'],422);
+        $record=(new AccreditationRepository($store))->create($input);
+        $journal->append('accreditation.submitted',['event_id'=>$eventId,'accreditation_id'=>$record['id'],'attendee_id'=>$record['attendee_id'],'actor_id'=>$actor['id']]);
+        JsonResponse::send($record,201);
+    }
+    if (preg_match('#^/accreditation/([^/]+)$#',$path,$m) && in_array($method,['PATCH','PUT'],true)) {
+        $actor=$auth->requirePermission('accreditation.manage');
+        $record=(new AccreditationRepository($store))->update($m[1],$body(),(string)$actor['id']);
+        if(!$record) JsonResponse::send(['error'=>'Accreditation record not found.'],404);
+        $journal->append('accreditation.updated',['event_id'=>$record['event_id'],'accreditation_id'=>$record['id'],'status'=>$record['status'],'actor_id'=>$actor['id']]);
+        JsonResponse::send($record);
+    }
+
+    if ($method === 'POST' && $path === '/onground/walk-in') {
+        $actor=$auth->requirePermission('onground.manage');$input=$body();$eventId=(string)($input['event_id']??'');$requireEvent($eventId);
+        $service=new WalkInRegistrationService(new EventRepository($store),new RegistrationRepository($store),new TicketRepository($store),new AttendeeRepository($store),new OrderRepository($store),new CredentialService($credentialSecret()));
+        $result=$service->register($eventId,$input);
+        $journal->append('walkin.registered',['event_id'=>$eventId,'attendee_id'=>$result['attendee']['id'],'actor_id'=>$actor['id']]);
+        $automation()->fire('person.registered',$result['attendee']);
+        if(($result['attendee']['status']??'')==='Confirmed')$automation()->fire('attendee.confirmed',$result['attendee']);
+        JsonResponse::send($result,201);
+    }
+
+    if ($method === 'GET' && $path === '/reports') {
+        $auth->requirePermission('reports.view');$requireEvent($eventQuery);
+        JsonResponse::send((new OperationalReportService($store))->summary($eventQuery));
+    }
+    if ($method === 'GET' && $path === '/reports/export') {
+        $auth->requirePermission('reports.view');$requireEvent($eventQuery);$type=(string)($_GET['type']??'attendees');
+        $csv=(new OperationalReportService($store))->export($eventQuery,$type);
+        header('Content-Type: text/csv; charset=utf-8');header('Content-Disposition: attachment; filename="digisangam-'.$type.'.csv"');echo $csv;exit;
+    }
+
+    if ($method === 'POST' && $path === '/intelligence/event-builder') {
+        $auth->requirePermission('events.manage');$input=$body();
+        JsonResponse::send((new EventBlueprintService())->build((string)($input['prompt']??'')));
+    }
+
+    if ($method === 'POST' && $path === '/media') {
+        $auth->requirePermission('media.manage');
+        $eventId=trim((string)($_POST['event_id']??''));$requireEvent($eventId);
+        if(empty($_FILES['file'])) JsonResponse::send(['error'=>'File is required.'],422);
+        $record=(new MediaRepository($store))->saveUpload($_FILES['file'],$eventId,(string)($_POST['kind']??'asset'),(bool)($_POST['public']??false));
+        JsonResponse::send($record,201);
+    }
+    if ($method === 'GET' && preg_match('#^/media/([^/]+)$#',$path,$m)) {
+        $auth->requirePermission('media.view');$media=(new MediaRepository($store))->stream($m[1]);
+        header('Content-Type: '.(string)$media['mime']);header('Content-Length: '.(string)$media['size']);readfile((string)$media['path']);exit;
+    }
+
+    if ($method === 'GET' && $path === '/wallet-passes') {
+        $auth->requirePermission('wallet.view');JsonResponse::send($forEvent((new WalletPassRepository($store))->all(),$eventQuery));
+    }
+
+    if ($method === 'GET' && $path === '/credential-bindings') {
+        $auth->requirePermission('credentials.view');JsonResponse::send($forEvent((new CredentialBindingRepository($store))->all(),$eventQuery));
+    }
+    if ($method === 'POST' && $path === '/credential-bindings') {
+        $auth->requirePermission('credentials.manage');$input=$body();$eventId=(string)($input['event_id']??'');$requireEvent($eventId);
+        $attendee=(new AttendeeRepository($store))->find((string)($input['attendee_id']??''));
+        if(!$attendee||($attendee['event_id']??'')!==$eventId) JsonResponse::send(['error'=>'Attendee does not belong to this event.'],422);
+        JsonResponse::send((new CredentialBindingRepository($store))->bind($eventId,(string)$attendee['id'],(string)($input['type']??''),(string)($input['uid']??'')),201);
+    }
+    if ($method === 'POST' && preg_match('#^/credential-bindings/([^/]+)/revoke$#',$path,$m)) {
+        $auth->requirePermission('credentials.manage');$row=(new CredentialBindingRepository($store))->revoke($m[1]);JsonResponse::send($row??['error'=>'Binding not found.'],$row?200:404);
+    }
+
+    if ($method === 'GET' && $path === '/developer/keys') {
+        $auth->requirePermission('developer.view');JsonResponse::send((new ApiKeyRepository($store))->publicList());
+    }
+    if ($method === 'POST' && $path === '/developer/keys') {
+        $auth->requirePermission('developer.manage');$input=$body();JsonResponse::send((new ApiKeyRepository($store))->create((string)($input['name']??''),(array)($input['scopes']??[]),(string)($input['event_id']??'')),201);
+    }
+    if ($method === 'POST' && preg_match('#^/developer/keys/([^/]+)/revoke$#',$path,$m)) {
+        $auth->requirePermission('developer.manage');$row=(new ApiKeyRepository($store))->revoke($m[1]);JsonResponse::send($row??['error'=>'API key not found.'],$row?200:404);
+    }
+    if ($method === 'GET' && $path === '/developer/webhooks') {
+        $auth->requirePermission('developer.view');JsonResponse::send($forEvent((new WebhookRepository($store))->publicList(),$eventQuery));
+    }
+    if ($method === 'POST' && $path === '/developer/webhooks') {
+        $auth->requirePermission('developer.manage');$input=$body();$requireEvent((string)($input['event_id']??''));JsonResponse::send((new WebhookRepository($store))->create($input),201);
+    }
+    if (preg_match('#^/developer/webhooks/([^/]+)$#',$path,$m) && in_array($method,['PATCH','PUT'],true)) {
+        $auth->requirePermission('developer.manage');$row=(new WebhookRepository($store))->update($m[1],$body());JsonResponse::send($row??['error'=>'Webhook not found.'],$row?200:404);
     }
 
     if ($method === 'GET' && $path === '/dashboard') {
