@@ -11,7 +11,7 @@ final class TicketRepository
 
     public function all(): array
     {
-        return $this->store->read('tickets/index.json', self::demo());
+        return $this->store->read('tickets/index.json', []);
     }
 
     public function publicForEvent(string $eventId): array
@@ -83,7 +83,7 @@ final class TicketRepository
             unset($row);
             if ($reserved === null) throw new \RuntimeException('Ticket not found for this event.');
             return ['data'=>$rows,'result'=>$reserved];
-        }, self::demo());
+        }, []);
     }
 
     public function releaseOne(string $ticketId,string $eventId): void
@@ -97,7 +97,7 @@ final class TicketRepository
             }
             unset($row);
             return $rows;
-        }, self::demo());
+        }, []);
     }
 
     private static function demo(): array
