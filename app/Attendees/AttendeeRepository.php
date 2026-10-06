@@ -85,6 +85,15 @@ final class AttendeeRepository
         return $updated;
     }
 
+    public function delete(string $id): bool
+    {
+        $rows=$this->all();
+        $next=array_values(array_filter($rows,static fn(array $row): bool => ($row['id']??'')!==$id));
+        if(count($next)===count($rows)) return false;
+        $this->store->write('attendees/index.json',$next);
+        return true;
+    }
+
     public function import(array $rows): array
     {
         $created = 0; $skipped = 0; $errors = [];
