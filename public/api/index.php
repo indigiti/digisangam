@@ -2,6 +2,15 @@
 declare(strict_types=1);
 
 use DigiSangam\Analytics\AnalyticsService;
+use DigiSangam\Agenda\SessionRepository;
+use DigiSangam\Automation\WorkflowEngine;
+use DigiSangam\Automation\WorkflowRepository;
+use DigiSangam\Badges\BadgeTemplateRepository;
+use DigiSangam\Communications\CampaignDispatchService;
+use DigiSangam\Communications\CampaignRepository;
+use DigiSangam\Exhibitors\ExhibitorRepository;
+use DigiSangam\OnGround\OfflineSnapshotService;
+use DigiSangam\Venue\VenueRepository;
 use DigiSangam\Attendees\AttendeeRepository;
 use DigiSangam\Auth\AuthenticationException;
 use DigiSangam\Auth\AuthorizationException;
@@ -382,6 +391,131 @@ try {
         $order=$orders->create($body());
         $journal->append('order.created',['order_id'=>$order['id'],'amount'=>$order['amount']]);
         JsonResponse::send($order,201);
+    }
+
+    // Phase 2 — Communications
+    $campaigns=new CampaignRepository($store);
+    if($method==='GET' && $path==='/campaigns'){
+        $auth->requirePermission('communications.view');
+        JsonResponse::send($campaigns->all());
+    }
+    if($method==='POST' && $path==='/campaigns'){
+        $auth->requirePermission('communications.manage');
+        $record=$campaigns->create($body());
+        $journal->append('campaign.created',['campaign_id'=>$record['id']]);
+        JsonResponse::send($record,201);
+    }
+    if(preg_match('#^/campaigns/([^/]+)$#',$path,$m) && in_array($method,['PUT','PATCH'],true)){
+        $auth->requirePermission('communications.manage');
+        $record=$campaigns->update($m[1],$body());
+        if(!$record) JsonResponse::send(['error'=>'Campaign not found.'],404);
+        JsonResponse::send($record);
+    }
+    if($method==='POST' && preg_match('#^/campaigns/([^/]+)/dispatch$#',$path,$m)){
+        $auth->requirePermission('communications.manage');
+        $result=(new CampaignDispatchService($campaigns,new AttendeeRepository($store),new NotificationOutbox($store)))->dispatch($m[1]);
+        $journal->append('campaign.dispatched',['campaign_id'=>$m[1],'queued'=>$result['queued']??0]);
+        JsonResponse::send($result);
+    }
+
+    // Phase 2 — Automation
+    $workflows=new WorkflowRepository($store);
+    if($method==='GET' && $path==='/automations'){
+        $auth->requirePermission('automation.view');
+        JsonResponse::send($workflows->all());
+    }
+    if($method==='POST' && $path==='/automations'){
+        $auth->requirePermission('automation.manage');
+        $record=$workflows->create($body());
+        $journal->append('automation.created',['workflow_id'=>$record['id']]);
+        JsonResponse::send($record,201);
+    }
+    if(preg_match('#^/automations/([^/]+)$#',$path,$m) && in_array($method,['PUT','PATCH'],true)){
+        $auth->requirePermission('automation.manage');
+        $record=$workflows->update($m[1],$body());
+        if(!$record) JsonResponse::send(['error'=>'Workflow not found.'],404);
+        JsonResponse::send($record);
+    }
+    if($method==='POST' && $path==='/automations/fire'){
+        $auth->requirePermission('automation.manage');
+        $input=$body();
+        JsonResponse::send((new WorkflowEngine($workflows,new NotificationOutbox($store)))->fire(
+            (string)($input['trigger']??''),
+            (array)($input['context']??[])
+        ));
+    }
+
+    // Phase 2 — Badge templates
+    $badges=new BadgeTemplateRepository($store);
+    if($method==='GET' && $path==='/badges'){
+        $auth->requirePermission('badges.view');
+        JsonResponse::send($badges->all());
+    }
+    if($method==='POST' && $path==='/badges'){
+        $auth->requirePermission('badges.manage');
+        JsonResponse::send($badges->create($body()),201);
+    }
+    if(preg_match('#^/badges/([^/]+)$#',$path,$m) && in_array($method,['PUT','PATCH'],true)){
+        $auth->requirePermission('badges.manage');
+        $record=$badges->update($m[1],$body());
+        JsonResponse::send($record??['error'=>'Badge template not found.'],$record?200:404);
+    }
+
+    // Phase 2 — Agenda
+    $sessions=new SessionRepository($store);
+    if($method==='GET' && $path==='/sessions'){
+        $auth->requirePermission('agenda.view');
+        JsonResponse::send($sessions->all());
+    }
+    if($method==='POST' && $path==='/sessions'){
+        $auth->requirePermission('agenda.manage');
+        JsonResponse::send($sessions->create($body()),201);
+    }
+    if(preg_match('#^/sessions/([^/]+)$#',$path,$m) && in_array($method,['PUT','PATCH'],true)){
+        $auth->requirePermission('agenda.manage');
+        $record=$sessions->update($m[1],$body());
+        JsonResponse::send($record??['error'=>'Session not found.'],$record?200:404);
+    }
+
+    // Phase 2 — Exhibitors and sponsors
+    $exhibitors=new ExhibitorRepository($store);
+    if($method==='GET' && $path==='/exhibitors'){
+        $auth->requirePermission('exhibitors.view');
+        JsonResponse::send($exhibitors->all());
+    }
+    if($method==='POST' && $path==='/exhibitors'){
+        $auth->requirePermission('exhibitors.manage');
+        JsonResponse::send($exhibitors->create($body()),201);
+    }
+    if(preg_match('#^/exhibitors/([^/]+)$#',$path,$m) && in_array($method,['PUT','PATCH'],true)){
+        $auth->requirePermission('exhibitors.manage');
+        $record=$exhibitors->update($m[1],$body());
+        JsonResponse::send($record??['error'=>'Exhibitor not found.'],$record?200:404);
+    }
+
+    // Phase 2 — Venue, zones and seating
+    if($method==='GET' && preg_match('#^/venue/([^/]+)$#',$path,$m)){
+        $auth->requirePermission('venue.view');
+        JsonResponse::send((new VenueRepository($store))->get($m[1]));
+    }
+    if(in_array($method,['PUT','PATCH'],true) && preg_match('#^/venue/([^/]+)$#',$path,$m)){
+        $auth->requirePermission('venue.manage');
+        $record=(new VenueRepository($store))->save($m[1],$body());
+        $journal->append('venue.updated',['event_id'=>$m[1]]);
+        JsonResponse::send($record);
+    }
+
+    // Phase 2 — signed offline package for OnGround clients
+    if($method==='GET' && preg_match('#^/onground/snapshot/([^/]+)$#',$path,$m)){
+        $auth->requirePermission('onground.view');
+        JsonResponse::send((new OfflineSnapshotService(
+            new AttendeeRepository($store),
+            new TicketRepository($store),
+            new VenueRepository($store),
+            new SessionRepository($store),
+            new BadgeTemplateRepository($store),
+            $credentialSecret(),
+        ))->build($m[1]));
     }
 
     JsonResponse::send(['error'=>'Not found','path'=>$path], 404);
