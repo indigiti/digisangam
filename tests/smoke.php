@@ -2,6 +2,14 @@
 declare(strict_types=1);
 
 use DigiSangam\Agenda\SessionRepository;
+use DigiSangam\Agenda\SessionAccessService;
+use DigiSangam\Agenda\SessionAttendanceRepository;
+use DigiSangam\Badges\PrintJobRepository;
+use DigiSangam\Commerce\OrderRepository;
+use DigiSangam\Exhibitors\LeadRepository;
+use DigiSangam\Exhibitors\MeetingRepository;
+use DigiSangam\OnGround\AccessPolicyService;
+use DigiSangam\Venue\SeatAssignmentRepository;
 use DigiSangam\Attendees\AttendeeRepository;
 use DigiSangam\Automation\WorkflowEngine;
 use DigiSangam\Automation\WorkflowRepository;
@@ -98,6 +106,41 @@ try{
     $expectedPayload=$credentials->issue('TKT_A','evt_001')['payload'];
     expect($offlinePayload===$expectedPayload,'Offline snapshot credential does not match attendee QR.');
     expect(!empty($snapshot['signature']),'Offline snapshot was not signed.');
+
+    // Phase 2: zone policy.
+    $access=new AccessPolicyService(new VenueRepository($store));
+    expect(($access->evaluate('evt_001','VIP','zone_vip')['allowed']??false)===true,'VIP zone rejected an allowed category.');
+    expect(($access->evaluate('evt_001','General','zone_vip')['allowed']??true)===false,'VIP zone accepted a disallowed category.');
+
+    // Phase 2: session entry is credential-aware and duplicate-safe.
+    $sessionAccess=new SessionAccessService(
+        $credentials,
+        new AttendeeRepository($store),
+        new OrderRepository($store),
+        new SessionRepository($store),
+        new SessionAttendanceRepository($store),
+    );
+    $sessionCredential=$credentials->issue('TKT_A','evt_001')['payload'];
+    $sessionEntry=$sessionAccess->enter('ses_open',$sessionCredential,'usr_test');
+    expect(($sessionEntry['allowed']??false)===true && ($sessionEntry['duplicate']??true)===false,'Session entry failed.');
+    $sessionDuplicate=$sessionAccess->enter('ses_open',$sessionCredential,'usr_test');
+    expect(($sessionDuplicate['duplicate']??false)===true,'Duplicate session entry was not detected.');
+
+    // Phase 2: reserved seats cannot collide.
+    $seatRepo=new SeatAssignmentRepository($store);
+    $seat=$seatRepo->assign('evt_001',['attendee_id'=>'TKT_A','hall_id'=>'hall_main','seat'=>'A12']);
+    expect(($seat['seat']??'')==='A12','Seat assignment failed.');
+    $collisionBlocked=false;
+    try{$seatRepo->assign('evt_001',['attendee_id'=>'TKT_B','hall_id'=>'hall_main','seat'=>'A12']);}catch(RuntimeException){$collisionBlocked=true;}
+    expect($collisionBlocked,'Seat collision was not blocked.');
+
+    // Phase 2: exhibitor floor and badge production records.
+    $lead=(new LeadRepository($store))->create(['event_id'=>'evt_001','exhibitor_id'=>'exh_001','attendee_id'=>'TKT_A','score'=>80,'intent'=>'hot']);
+    expect(($lead['intent']??'')==='hot','Lead capture failed.');
+    $meeting=(new MeetingRepository($store))->create(['event_id'=>'evt_001','exhibitor_id'=>'exh_001','attendee_id'=>'TKT_A','start_at'=>'2026-10-12T14:00']);
+    expect(($meeting['status']??'')==='scheduled','Meeting creation failed.');
+    $print=(new PrintJobRepository($store))->create(['event_id'=>'evt_001','attendee_id'=>'TKT_A','template_id'=>'bdg_default']);
+    expect(($print['status']??'')==='queued','Badge print queue failed.');
 
     fwrite(STDOUT,"DigiSangam Phase 1 + Phase 2 smoke tests passed.\n");
 }finally{
