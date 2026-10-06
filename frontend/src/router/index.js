@@ -23,7 +23,7 @@ import VenuePage from '../pages/VenuePage.vue'
 import SettingsPage from '../pages/SettingsPage.vue'
 
 export default createRouter({
-  history:createWebHistory(),
+  history:createWebHistory(import.meta.env.BASE_URL),
   routes:[
     {path:'/access',name:'access',component:AccessPage,meta:{public:true}},
     {path:'/e/:id',name:'public-event',component:PublicEventPage,meta:{public:true}},
