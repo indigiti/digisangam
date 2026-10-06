@@ -518,6 +518,27 @@ try {
         ))->build($m[1]));
     }
 
+    if($method==='POST' && $path==='/onground/sync'){
+        $user=$auth->requirePermission('attendees.checkin');
+        $input=$body();
+        $results=[];
+        foreach((array)($input['items']??[]) as $item){
+            $localId=(string)($item['local_id']??'');
+            $result=$scanner()->checkin((string)($item['payload']??''),(string)$user['id']);
+            $results[]=['local_id'=>$localId,'result'=>$result];
+            if(!empty($result['allowed'])){
+                $journal->append('attendee.checked_in.offline_sync',[
+                    'attendee_id'=>$result['attendee']['id']??null,
+                    'event_id'=>$result['event_id']??null,
+                    'operator_id'=>$user['id'],
+                    'scanned_at'=>$item['scanned_at']??null,
+                    'already_checked_in'=>$result['already_checked_in']??false,
+                ]);
+            }
+        }
+        JsonResponse::send(['synced'=>count($results),'results'=>$results]);
+    }
+
     JsonResponse::send(['error'=>'Not found','path'=>$path], 404);
 } catch (AuthenticationException $e) {
     JsonResponse::send(['error'=>$e->getMessage(),'code'=>'AUTH_REQUIRED'],401);
