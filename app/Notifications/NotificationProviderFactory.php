@@ -29,6 +29,7 @@ final class NotificationProviderFactory
                 (string)getenv('WHATSAPP_PHONE_NUMBER_ID'),
                 (string)getenv('WHATSAPP_ACCESS_TOKEN'),
                 (string)(getenv('WHATSAPP_TEMPLATE_LANGUAGE')?:'en'),
+                trim((string)getenv('WHATSAPP_GRAPH_VERSION')),
             )
             : new LogWhatsAppProvider();
     }
