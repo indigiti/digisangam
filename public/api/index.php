@@ -755,7 +755,8 @@ try {
     }
     if($method==='POST' && $path==='/campaigns'){
         $auth->requirePermission('communications.manage');
-        $input=$body();$requireEvent((string)($input['event_id']??''));
+        $input=$body();$event=$requireEvent((string)($input['event_id']??''));
+        $input['timezone']=(string)($input['timezone']??$event['timezone']??'UTC');
         $record=$campaigns->create($input);
         $journal->append('campaign.created',['campaign_id'=>$record['id'],'event_id'=>$record['event_id']]);
         JsonResponse::send($record,201);
