@@ -23,6 +23,7 @@ use DigiSangam\Attendees\AttendeeRepository;
 use DigiSangam\Auth\AuthenticationException;
 use DigiSangam\Auth\AuthorizationException;
 use DigiSangam\Auth\AuthService;
+use DigiSangam\Auth\Authorization;
 use DigiSangam\Commerce\OrderRepository;
 use DigiSangam\Core\Csv\CsvService;
 use DigiSangam\Core\EventJournal\EventJournal;
@@ -406,7 +407,8 @@ try {
     // Phase 3 — EventOS Intelligence
     if ($method === 'GET' && $path === '/intelligence/overview') {
         $auth->requirePermission('intelligence.view');
-        $eventId=(string)($_GET['event_id'] ?? 'evt_001');
+        $eventId=trim((string)($_GET['event_id'] ?? ''));
+        $requireEvent($eventId);
         $graph=(new EventGraphBuilder($store))->build($eventId);
         JsonResponse::send([
             'event_id'=>$eventId,
@@ -422,14 +424,16 @@ try {
 
     if ($method === 'GET' && $path === '/intelligence/graph') {
         $auth->requirePermission('intelligence.view');
-        $eventId=(string)($_GET['event_id'] ?? 'evt_001');
+        $eventId=trim((string)($_GET['event_id'] ?? ''));
+        $requireEvent($eventId);
         JsonResponse::send((new EventGraphBuilder($store))->build($eventId));
     }
 
     if ($method === 'POST' && $path === '/intelligence/copilot') {
         $auth->requirePermission('intelligence.use');
         $input=$body();
-        $eventId=(string)($input['event_id'] ?? 'evt_001');
+        $eventId=trim((string)($input['event_id'] ?? ''));
+        $requireEvent($eventId);
         $question=trim((string)($input['question'] ?? ''));
         if($question==='') JsonResponse::send(['error'=>'Question is required.'],422);
         $graph=(new EventGraphBuilder($store))->build($eventId);
