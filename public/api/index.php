@@ -10,6 +10,7 @@ use DigiSangam\Communications\CampaignDispatchService;
 use DigiSangam\Communications\CampaignRepository;
 use DigiSangam\Exhibitors\ExhibitorRepository;
 use DigiSangam\OnGround\OfflineSnapshotService;
+use DigiSangam\OnGround\AccessPolicyService;
 use DigiSangam\Venue\VenueRepository;
 use DigiSangam\Attendees\AttendeeRepository;
 use DigiSangam\Auth\AuthenticationException;
@@ -86,6 +87,7 @@ $scanner = static function () use ($store,$credentialSecret): ScannerService {
         new AttendeeRepository($store),
         new OrderRepository($store),
         new CheckinRepository($store),
+        new AccessPolicyService(new VenueRepository($store)),
     );
 };
 
@@ -242,13 +244,13 @@ try {
     if ($method === 'POST' && $path === '/scanner/verify') {
         $auth->requirePermission('attendees.checkin');
         $input=$body();
-        JsonResponse::send($scanner()->verify((string)($input['payload'] ?? '')));
+        JsonResponse::send($scanner()->verify((string)($input['payload'] ?? ''),(string)($input['zone_id'] ?? '')));
     }
 
     if ($method === 'POST' && $path === '/scanner/checkin') {
         $user=$auth->requirePermission('attendees.checkin');
         $input=$body();
-        $result=$scanner()->checkin((string)($input['payload'] ?? ''),(string)$user['id']);
+        $result=$scanner()->checkin((string)($input['payload'] ?? ''),(string)$user['id'],(string)($input['zone_id'] ?? ''));
         if(!empty($result['allowed'])){
             $journal->append('attendee.checked_in',[
                 'attendee_id'=>$result['attendee']['id'] ?? null,
@@ -556,7 +558,7 @@ try {
         $results=[];
         foreach((array)($input['items']??[]) as $item){
             $localId=(string)($item['local_id']??'');
-            $result=$scanner()->checkin((string)($item['payload']??''),(string)$user['id']);
+            $result=$scanner()->checkin((string)($item['payload']??''),(string)$user['id'],(string)($item['zone_id']??''));
             $results[]=['local_id'=>$localId,'result'=>$result];
             if(!empty($result['allowed'])){
                 $journal->append('attendee.checked_in.offline_sync',[
