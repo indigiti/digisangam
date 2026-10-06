@@ -2,7 +2,10 @@
 declare(strict_types=1);
 
 if (!defined('DIGISANGAM_ROOT')) define('DIGISANGAM_ROOT', dirname(__DIR__));
-if (!defined('DIGISANGAM_STORAGE_ROOT')) define('DIGISANGAM_STORAGE_ROOT', DIGISANGAM_ROOT . '/storage');
+if (!defined('DIGISANGAM_STORAGE_ROOT')) {
+    $configured=trim((string)getenv('DIGISANGAM_STORAGE_ROOT'));
+    define('DIGISANGAM_STORAGE_ROOT', $configured!=='' ? rtrim($configured,'/\\') : DIGISANGAM_ROOT . '/storage');
+}
 
 spl_autoload_register(static function (string $class): void {
     $prefix = 'DigiSangam\\';
