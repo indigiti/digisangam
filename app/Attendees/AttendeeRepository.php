@@ -61,6 +61,7 @@ final class AttendeeRepository
             'phone'=>trim((string)($input['phone'] ?? '')),
             'event_id'=>$eventId,
             'ticket_id'=>(string)($input['ticket_id'] ?? ''),
+            'source'=>trim((string)($input['source'] ?? 'admin')) ?: 'admin',
             'answers'=>(array)($input['answers'] ?? []),
             'confirmation_token'=>(string)($input['confirmation_token'] ?? bin2hex(random_bytes(24))),
             'created_at'=>date(DATE_ATOM),
