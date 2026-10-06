@@ -51,6 +51,7 @@ final class OrderRepository
             'created_at'=>date(DATE_ATOM),
         ];
         if(($record['event_id']??'')==='') throw new \InvalidArgumentException('Event is required.');
+        if(($record['event_id']??'')==='') throw new \InvalidArgumentException('Event is required.');
         array_unshift($rows, $record);
         $this->store->write('orders/index.json', $rows);
         return $record;
