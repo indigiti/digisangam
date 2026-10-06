@@ -8,6 +8,20 @@ final class NotificationTemplateRenderer
     public function render(string $template,array $data): array
     {
         $confirmation=$this->confirmationUrl((string)($data['event_id']??''),(string)($data['confirmation_token']??''));
+
+        if($template==='custom_campaign'){
+            $subject=trim((string)($data['subject']??'Event update')) ?: 'Event update';
+            $content=trim((string)($data['content']??''));
+            $safe=nl2br(htmlspecialchars($content,ENT_QUOTES|ENT_SUBSTITUTE,'UTF-8'));
+            return [
+                'subject'=>$subject,
+                'html'=>'<div style="font-family:Arial,sans-serif;line-height:1.6">'.$safe.'</div>'.($confirmation!==''?'<p><a href="'.htmlspecialchars($confirmation,ENT_QUOTES).'">View your registration</a></p>':''),
+                'text'=>$content.($confirmation!==''?"\n\nView your registration: ".$confirmation:''),
+                'whatsapp_template'=>'custom_campaign',
+                'whatsapp_parameters'=>[$content,$confirmation],
+            ];
+        }
+
         return match($template){
             'payment_confirmed'=>[
                 'subject'=>'Payment confirmed — your DigiSangam registration',
@@ -15,6 +29,13 @@ final class NotificationTemplateRenderer
                 'text'=>'Payment confirmed. '.($confirmation!==''?'Open your ticket: '.$confirmation:''),
                 'whatsapp_template'=>'payment_confirmed',
                 'whatsapp_parameters'=>[$confirmation],
+            ],
+            'post_checkin'=>[
+                'subject'=>'Welcome to the event',
+                'html'=>'<h2>You are checked in</h2><p>Welcome. We hope you have a great event experience.</p>',
+                'text'=>'You are checked in. Welcome to the event.',
+                'whatsapp_template'=>'post_checkin',
+                'whatsapp_parameters'=>[],
             ],
             default=>[
                 'subject'=>'Registration received',
