@@ -9,18 +9,18 @@ final class Authorization
         'super_admin' => ['*'],
         'workspace_admin' => [
             'events.*','registration.*','attendees.*','tickets.*','commerce.*','analytics.view','workspace.*',
-            'communications.*','automation.*','badges.*','agenda.*','exhibitors.*','venue.*','onground.*'
+            'communications.*','automation.*','badges.*','agenda.*','exhibitors.*','venue.*','onground.*','intelligence.*'
         ],
         'event_manager' => [
             'events.*','registration.*','attendees.*','tickets.*','analytics.view',
-            'communications.*','automation.*','badges.*','agenda.*','exhibitors.*','venue.*','onground.view'
+            'communications.*','automation.*','badges.*','agenda.*','exhibitors.*','venue.*','onground.view','intelligence.*'
         ],
-        'registration_manager' => ['registration.*','attendees.*','tickets.view','analytics.view','communications.view','badges.view','agenda.view'],
-        'finance' => ['tickets.view','commerce.*','analytics.view','exhibitors.view'],
-        'onsite' => ['attendees.view','attendees.checkin','tickets.view','onground.*','badges.view','venue.view','agenda.view'],
+        'registration_manager' => ['registration.*','attendees.*','tickets.view','analytics.view','communications.view','badges.view','agenda.view','intelligence.view'],
+        'finance' => ['tickets.view','commerce.*','analytics.view','exhibitors.view','intelligence.view'],
+        'onsite' => ['attendees.view','attendees.checkin','tickets.view','onground.*','badges.view','venue.view','agenda.view','intelligence.view'],
         'viewer' => [
             'events.view','attendees.view','tickets.view','analytics.view','communications.view','automation.view',
-            'badges.view','agenda.view','exhibitors.view','venue.view','onground.view'
+            'badges.view','agenda.view','exhibitors.view','venue.view','onground.view','intelligence.view'
         ],
     ];
 
