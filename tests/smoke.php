@@ -391,7 +391,7 @@ try{
 
     // Walk-in registration creates a real attendee and stable credential.
     $walkin=(new WalkInRegistrationService($events,$registration,$tickets,$attendees,$orders,$credentials))->register($eventId,[
-        'name'=>'Walk In User','phone'=>'918888888888','category'=>'General','payment_settled'=>true,
+        'name'=>'Walk In User','email'=>'walkin@example.test','phone'=>'918888888888','category'=>'General','payment_settled'=>true,
     ]);
     expect(($walkin['attendee']['source']??'')==='walk_in' && !empty($walkin['credential']['payload']),'Walk-in registration failed.');
 
