@@ -105,6 +105,9 @@ try{
     if(($registration['title']??'')!=='HTTP Registration') fail('Registration initialization not persisted.',$registration);
     if(($registration['categories']??[])!==['General','VIP']) fail('Registration categories not persisted.',$registration);
 
+    $preview=request('GET','/api/v1/events/'.rawurlencode($eventId).'/preview')['data'];
+    if(empty($preview['preview'])||($preview['event']['status']??'')!=='Draft') fail('Authenticated draft preview failed.',$preview);
+
     $tickets=request('GET','/api/v1/tickets?event_id='.rawurlencode($eventId))['data'];
     if(count($tickets)!==1||($tickets[0]['name']??'')!=='General Admission') fail('Initial ticket not created/scoped.',$tickets);
     $ticketId=(string)$tickets[0]['id'];
@@ -148,6 +151,31 @@ try{
 
     $intelligence=request('GET','/api/v1/intelligence/overview?event_id='.rawurlencode($eventId))['data'];
     if(($intelligence['event_id']??'')!==$eventId) fail('Intelligence is not scoped to the selected event.',$intelligence);
+
+    $paidTicket=request('POST','/api/v1/tickets',[
+        'event_id'=>$eventId,
+        'name'=>'Paid Admission',
+        'price'=>1500,
+        'quantity'=>10,
+        'status'=>'Active',
+    ],$csrf)['data'];
+    $paidRegistration=request('POST','/api/v1/public/events/'.rawurlencode($eventId).'/register',[
+        'ticket_id'=>$paidTicket['id'],
+        'answers'=>[
+            'fld_name'=>'Manual Payment Attendee',
+            'fld_email'=>'manual-pay@example.test',
+            'fld_phone'=>'919811111111',
+            'fld_category'=>'General',
+            'fld_company'=>'Manual Co',
+        ],
+        'website'=>'',
+    ])['data'];
+    if(($paidRegistration['order']['status']??'')!=='pending'||($paidRegistration['attendee']['status']??'')!=='Pending') fail('Manual paid registration should remain pending before settlement.',$paidRegistration);
+    $paidOrderId=(string)$paidRegistration['order']['id'];
+    $captured=request('POST','/api/v1/orders/'.rawurlencode($paidOrderId).'/capture',['payment_reference'=>'CASH-TEST-001'],$csrf)['data'];
+    if(($captured['order']['status']??'')!=='paid'||($captured['attendee']['status']??'')!=='Confirmed') fail('Manual payment capture did not confirm attendee.',$captured);
+    $refunded=request('POST','/api/v1/orders/'.rawurlencode($paidOrderId).'/refund',['payment_reference'=>'REFUND-TEST-001'],$csrf)['data'];
+    if(($refunded['order']['status']??'')!=='refunded'||($refunded['attendee']['status']??'')!=='Pending') fail('Manual refund did not revoke paid attendee state.',$refunded);
 
     $event2=request('POST','/api/v1/events',[
         'name'=>'Isolation Event',
