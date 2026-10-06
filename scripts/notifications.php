@@ -9,7 +9,7 @@ use DigiSangam\Notifications\NotificationWorker;
 
 require dirname(__DIR__) . '/app/bootstrap.php';
 
-$store=new JsonFileStore(dirname(__DIR__).'/storage');
+$store=new JsonFileStore(defined('DIGISANGAM_STORAGE_ROOT') ? DIGISANGAM_STORAGE_ROOT : dirname(__DIR__).'/storage');
 $worker=new NotificationWorker(
     new NotificationOutbox($store),
     new NotificationTemplateRenderer(),
