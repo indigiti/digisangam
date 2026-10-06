@@ -209,6 +209,58 @@ class IntelligenceEngine:
             })
         return items[:8]
 
+    def event_blueprint(self, prompt: str) -> dict[str, Any]:
+        prompt = prompt.strip()
+        if not prompt:
+            raise ValueError("Describe the event you want to create.")
+        lower = prompt.lower()
+        event_type = "Expo" if "expo" in lower else "Awards" if "award" in lower else "Workshop" if "workshop" in lower else "Webinar" if "webinar" in lower else "Conference"
+        event_format = "virtual" if "virtual" in lower else "hybrid" if "hybrid" in lower else "in_person"
+        categories = ["General"]
+        for category in ["VIP", "Speaker", "Media", "Sponsor", "Exhibitor"]:
+            if category.lower() in lower and category not in categories:
+                categories.append(category)
+        if event_type == "Expo":
+            for category in ["Exhibitor", "Visitor"]:
+                if category not in categories:
+                    categories.append(category)
+        first = prompt.replace("\n", ".").split(".")[0].strip()
+        name = (first[:69] + "…") if len(first) > 72 else first
+        if not name:
+            name = f"New {event_type}"
+        paid = any(token in lower for token in ["₹", "inr", "paid", "ticket"])
+        return {
+            "name": name,
+            "description": prompt,
+            "type": event_type,
+            "category": "Trade & Business" if event_type == "Expo" else "Business",
+            "format": event_format,
+            "timezone": "Asia/Kolkata",
+            "currency": "INR",
+            "privacy": "public",
+            "registration": {
+                "title": f"{name} Registration",
+                "approval_mode": "manual" if "approval" in lower else "auto",
+                "categories": categories,
+                "fields": [
+                    {"id":"fld_name","label":"Full Name","type":"text","required":True,"visibility":"always"},
+                    {"id":"fld_email","label":"Email Address","type":"email","required":True,"visibility":"always"},
+                    {"id":"fld_phone","label":"Mobile Number","type":"phone","required":True,"visibility":"always"},
+                    {"id":"fld_category","label":"Category","type":"select","required":True,"visibility":"always"},
+                    {"id":"fld_company","label":"Company Name","type":"text","required":False,"visibility":"always"},
+                ],
+            },
+            "ticket": {"enabled": True, "name": "General Admission" if paid else "Registration", "price": 0, "quantity": 500},
+            "branding": {"brand_name": name, "primary_color":"#4f46e5","secondary_color":"#06b6d4","background_color":"#0f172a"},
+            "public_page": {"headline": name, "show_location": True, "show_organizer": True},
+            "explanation": [
+                f"Event type inferred as {event_type}.",
+                f"Format inferred as {event_format.replace('_',' ')}.",
+                "Registration categories inferred from your description.",
+                "A ticketed setup was detected; set the final price before publishing." if paid else "A free registration ticket was prepared.",
+            ],
+        }
+
     def copilot(self, question: str, graph: dict[str, Any], analysis: dict[str, Any]) -> dict[str, Any]:
         q = question.lower().strip()
         metrics = graph.get("metrics", {})
