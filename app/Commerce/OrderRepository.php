@@ -14,6 +14,12 @@ final class OrderRepository
         return $this->store->read('orders/index.json', []);
     }
 
+    public function findLatestByAttendee(string $attendeeId): ?array
+    {
+        foreach($this->all() as $row) if(($row['attendee_id']??'')===$attendeeId) return $row;
+        return null;
+    }
+
     public function create(array $input): array
     {
         $rows = $this->all();
