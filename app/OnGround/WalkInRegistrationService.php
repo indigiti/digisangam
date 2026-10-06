@@ -28,7 +28,7 @@ final class WalkInRegistrationService
         $name=trim((string)($input['name']??''));
         $email=strtolower(trim((string)($input['email']??'')));
         $phone=trim((string)($input['phone']??''));
-        if($name==='' || ($email===''&&$phone==='')) throw new \InvalidArgumentException('Name and email or phone are required.');
+        if($name==='' || !filter_var($email,FILTER_VALIDATE_EMAIL)) throw new \InvalidArgumentException('Name and a valid email are required.');
 
         $schema=$this->registration->schema($eventId);
         $category=trim((string)($input['category']??($schema['categories'][0]??'General')));
