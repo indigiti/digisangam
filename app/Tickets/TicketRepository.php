@@ -41,7 +41,7 @@ final class TicketRepository
             'quantity'=>max(1,(int)($input['quantity'] ?? 1)),
             'sold'=>0,
             'status'=>(string)($input['status'] ?? 'Active'),
-            'event_id'=>(string)($input['event_id'] ?? 'evt_001'),
+            'event_id'=>trim((string)($input['event_id'] ?? '')),
             'sale_start'=>(string)($input['sale_start'] ?? ''),
             'sale_end'=>(string)($input['sale_end'] ?? ''),
             'created_at'=>date(DATE_ATOM),
