@@ -24,6 +24,11 @@ final class IntelligenceClient
         return $this->request('/v1/copilot',['question'=>$question,'graph'=>$graph]) ?? $this->fallback->copilot($question,$graph);
     }
 
+    public function eventBuilder(string $prompt): array
+    {
+        return $this->request('/v1/event-builder',['prompt'=>$prompt]) ?? (new EventBlueprintService())->build($prompt);
+    }
+
     public function concierge(string $question,string $attendeeId,array $graph): array
     {
         return $this->request('/v1/concierge',['question'=>$question,'attendee_id'=>$attendeeId,'graph'=>$graph]) ?? $this->fallback->concierge($question,$attendeeId,$graph);
