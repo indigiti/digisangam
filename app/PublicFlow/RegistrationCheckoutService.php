@@ -48,6 +48,7 @@ final class RegistrationCheckoutService
 
     public function register(string $eventId, array $input): array
     {
+        if (!empty($input['website'])) throw new \InvalidArgumentException('Invalid submission.');
         $public = $this->publicEvent($eventId);
         $schema = $this->registration->schema($eventId);
         $answers = is_array($input['answers'] ?? null) ? $input['answers'] : [];
@@ -61,6 +62,7 @@ final class RegistrationCheckoutService
 
         if (!filter_var($email, FILTER_VALIDATE_EMAIL)) throw new \InvalidArgumentException('A valid email is required.');
         if ($name === '') throw new \InvalidArgumentException('Full name is required.');
+        if ($this->attendees->findByEmailForEvent($email,$eventId)) throw new \InvalidArgumentException('This email is already registered for the event.');
 
         $approvalMode = (string)($schema['approval_mode'] ?? 'auto');
         if ($approvalMode === 'invite_only') $this->assertInvitation($email);
@@ -71,39 +73,43 @@ final class RegistrationCheckoutService
         if (!$ticket || ($ticket['event_id'] ?? '') !== $eventId) throw new \InvalidArgumentException('Selected ticket is invalid.');
 
         $reserved = $this->tickets->reserveOne($ticketId, $eventId);
-        $status = $approvalMode === 'manual' ? 'Pending' : 'Confirmed';
+        $requiresPayment=(int)($reserved['price'] ?? 0) > 0;
+        $status = ($approvalMode === 'manual' || $requiresPayment) ? 'Pending' : 'Confirmed';
         $confirmationToken = bin2hex(random_bytes(24));
-        $attendee = $this->attendees->create([
-            'name'=>$name,'email'=>$email,'phone'=>$phone,'company'=>$company,'category'=>$category,
-            'status'=>$status,'event_id'=>$eventId,'ticket_id'=>$ticketId,'answers'=>$answers,
-            'confirmation_token'=>$confirmationToken,
-        ]);
 
-        $order = $this->orders->create([
-            'event_id'=>$eventId,
-            'attendee_id'=>$attendee['id'],
-            'ticket_id'=>$ticketId,
-            'amount'=>(int)($reserved['price'] ?? 0),
-            'currency'=>'INR',
-            'status'=>(int)($reserved['price'] ?? 0) === 0 ? 'paid' : 'pending',
-        ]);
-        $payment = $this->payments->create($order, ['attendee'=>$attendee,'event'=>$public['event'],'ticket'=>$reserved]);
-
-        if (($payment['status'] ?? '') === 'paid') {
-            $order['status'] = 'paid';
-            $order['payment_reference'] = $payment['payment_reference'] ?? '';
+        try {
+            $attendee = $this->attendees->create([
+                'name'=>$name,'email'=>$email,'phone'=>$phone,'company'=>$company,'category'=>$category,
+                'status'=>$status,'event_id'=>$eventId,'ticket_id'=>$ticketId,'answers'=>$answers,
+                'confirmation_token'=>$confirmationToken,
+            ]);
+        } catch (\Throwable $e) {
+            throw $e;
         }
 
-        $credential = $status === 'Confirmed'
+        $order = $this->orders->create([
+            'event_id'=>$eventId,'attendee_id'=>$attendee['id'],'ticket_id'=>$ticketId,
+            'amount'=>(int)($reserved['price'] ?? 0),'currency'=>'INR','status'=>$requiresPayment?'pending':'paid',
+        ]);
+        $payment = $this->payments->create($order, ['attendee'=>$attendee,'event'=>$public['event'],'ticket'=>$reserved]);
+        $order = $this->orders->updatePayment((string)$order['id'],$payment) ?? $order;
+
+        if (($payment['status'] ?? '') === 'paid' && $approvalMode !== 'manual') {
+            $attendee = $this->attendees->update((string)$attendee['id'],['status'=>'Confirmed']) ?? $attendee;
+        }
+
+        $credential = ($attendee['status'] ?? '') === 'Confirmed' && ($order['status'] ?? '') === 'paid'
             ? $this->credentials->issue((string)$attendee['id'], $eventId)
             : null;
 
         $this->notifications->queue('email','registration_confirmation',['email'=>$email],[
-            'event_id'=>$eventId,'attendee_id'=>$attendee['id'],'status'=>$status,'confirmation_token'=>$confirmationToken
+            'event_id'=>$eventId,'attendee_id'=>$attendee['id'],'status'=>$attendee['status'],'confirmation_token'=>$confirmationToken
         ]);
-        $this->notifications->queue('whatsapp','registration_confirmation',['phone'=>$phone],[
-            'event_id'=>$eventId,'attendee_id'=>$attendee['id'],'status'=>$status
-        ]);
+        if ($phone !== '') {
+            $this->notifications->queue('whatsapp','registration_confirmation',['phone'=>$phone],[
+                'event_id'=>$eventId,'attendee_id'=>$attendee['id'],'status'=>$attendee['status']
+            ]);
+        }
 
         return [
             'attendee'=>$this->publicAttendee($attendee),
@@ -125,12 +131,7 @@ final class RegistrationCheckoutService
         $credential = ($attendee['status'] ?? '') === 'Confirmed'
             ? $this->credentials->issue((string)$attendee['id'], (string)$attendee['event_id'])
             : null;
-        return [
-            'attendee'=>$this->publicAttendee($attendee),
-            'event'=>$event,
-            'ticket'=>$ticket,
-            'credential'=>$credential,
-        ];
+        return ['attendee'=>$this->publicAttendee($attendee),'event'=>$event,'ticket'=>$ticket,'credential'=>$credential];
     }
 
     private function validateRequiredFields(array $fields, array $answers): void
