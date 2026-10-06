@@ -631,7 +631,7 @@ try {
         $auth->requirePermission('attendees.view');
         $record=$attendees->find($m[1]);
         if(!$record) JsonResponse::send(['error'=>'Attendee not found.'],404);
-        JsonResponse::send((new CredentialService($credentialSecret()))->issue((string)$record['id'],(string)($record['event_id'] ?? 'evt_001')));
+        JsonResponse::send((new CredentialService($credentialSecret()))->issue((string)$record['id'],(string)($record['event_id'] ?? '')));
     }
     if (preg_match('#^/attendees/([^/]+)$#',$path,$m)) {
         $id=$m[1];
@@ -699,9 +699,52 @@ try {
             if(!$ticket || ($ticket['event_id']??'')!==$event['id']) throw new InvalidArgumentException('Ticket does not belong to this event.');
         }
         $input['currency']=strtoupper((string)($input['currency']??$event['currency']??'INR'));
+        $input['provider']='manual';
+        $input['status']=((int)($input['amount']??0)===0)?'paid':'pending';
         $order=$orders->create($input);
         $journal->append('order.created',['order_id'=>$order['id'],'amount'=>$order['amount'],'event_id'=>$order['event_id']]);
         JsonResponse::send($order,201);
+    }
+
+    if($method==='POST' && preg_match('#^/orders/([^/]+)/capture$#',$path,$m)){
+        $auth->requirePermission('commerce.manage');
+        $order=$orders->find($m[1]);
+        if(!$order) JsonResponse::send(['error'=>'Order not found.'],404);
+        $requireEvent((string)($order['event_id']??''));
+        if(($order['status']??'')==='refunded') throw new RuntimeException('Refunded orders cannot be captured.');
+        $input=$body();
+        $reference=trim((string)($input['payment_reference']??''));
+        if($reference==='') $reference='MANUAL-'.strtoupper(substr((string)$order['id'],-8));
+        $capture=$paymentCapture()->capture((string)$order['id'],'manual',$reference);
+        if(empty($capture['duplicate'])&&!empty($capture['attendee'])){
+            $context=(array)$capture['attendee'];
+            $context['event_id']=$order['event_id']??($context['event_id']??'');
+            $context['order_id']=$order['id'];
+            $automation()->fire('payment.captured',$context);
+            if(($context['status']??'')==='Confirmed') $automation()->fire('attendee.confirmed',$context);
+        }
+        JsonResponse::send($capture);
+    }
+
+    if($method==='POST' && preg_match('#^/orders/([^/]+)/refund$#',$path,$m)){
+        $auth->requirePermission('commerce.manage');
+        $order=$orders->find($m[1]);
+        if(!$order) JsonResponse::send(['error'=>'Order not found.'],404);
+        $requireEvent((string)($order['event_id']??''));
+        if(($order['status']??'')!=='paid') throw new RuntimeException('Only paid orders can be refunded.');
+        $input=$body();
+        $reference=trim((string)($input['payment_reference']??$order['payment_reference']??''));
+        $order=$orders->updatePayment((string)$order['id'],[
+            'status'=>'refunded',
+            'provider'=>(string)($order['provider']??'manual'),
+            'payment_reference'=>$reference,
+        ])??$order;
+        $attendee=null;
+        if(!empty($order['attendee_id'])){
+            $attendee=(new AttendeeRepository($store))->update((string)$order['attendee_id'],['status'=>'Pending']);
+        }
+        $journal->append('payment.refunded',['order_id'=>$order['id'],'event_id'=>$order['event_id'],'payment_reference'=>$reference]);
+        JsonResponse::send(['order'=>$order,'attendee'=>$attendee]);
     }
 
     // Phase 2 — Communications
