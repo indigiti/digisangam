@@ -18,7 +18,7 @@ final class SessionRepository
     {
         $record=[
             'id'=>'ses_'.bin2hex(random_bytes(6)),
-            'event_id'=>(string)($input['event_id']??'evt_001'),
+            'event_id'=>trim((string)($input['event_id'] ?? '')),
             'title'=>trim((string)($input['title']??'Untitled Session')),
             'track'=>(string)($input['track']??'Main'),
             'room'=>(string)($input['room']??'Main Hall'),
@@ -29,6 +29,7 @@ final class SessionRepository
             'status'=>(string)($input['status']??'published'),
             'created_at'=>date(DATE_ATOM),
         ];
+        if(($record['event_id']??'')==='') throw new \InvalidArgumentException('Event is required.');
         $rows=$this->all(); array_unshift($rows,$record);
         $this->store->write('agenda/sessions.json',$rows);
         return $record;
