@@ -13,6 +13,7 @@ final class NotificationWorker
         private readonly EmailProviderInterface $email,
         private readonly WhatsAppProviderInterface $whatsapp,
         private readonly ?CampaignRepository $campaigns=null,
+        private readonly ?SmsProviderInterface $sms=null,
     ) {}
 
     public function run(int $limit=25): array
@@ -28,11 +29,14 @@ final class NotificationWorker
                 }elseif(($message['channel']??'')==='whatsapp'){
                     $to=(string)($message['recipient']['phone']??'');
                     $result=$this->whatsapp->sendTemplate($to,(string)$template['whatsapp_template'],(array)$template['whatsapp_parameters']);
+                }elseif(($message['channel']??'')==='sms'){
+                    $to=(string)($message['recipient']['phone']??'');
+                    $result=($this->sms??new LogSmsProvider())->send($to,(string)$template['text']);
                 }else{
                     throw new \RuntimeException('Unsupported notification channel.');
                 }
 
-                $deliveryStatus=(($result['provider']??'')==='log')?'simulated':'sent';
+                $deliveryStatus=(($result['provider']??'')==='log'||!empty($result['simulated']))?'simulated':'sent';
                 $this->outbox->mark((string)$message['id'],$deliveryStatus,[
                     'provider'=>$result['provider']??'unknown',
                     'provider_message_id'=>$result['id']??'',
