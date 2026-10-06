@@ -1,6 +1,8 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import AppShell from '../layouts/AppShell.vue'
 import AccessPage from '../pages/AccessPage.vue'
+import PublicEventPage from '../pages/PublicEventPage.vue'
+import PublicConfirmationPage from '../pages/PublicConfirmationPage.vue'
 import DashboardPage from '../pages/DashboardPage.vue'
 import EventsPage from '../pages/EventsPage.vue'
 import EventCreatePage from '../pages/EventCreatePage.vue'
@@ -17,6 +19,8 @@ export default createRouter({
   history:createWebHistory(),
   routes:[
     {path:'/access',name:'access',component:AccessPage,meta:{public:true}},
+    {path:'/e/:id',name:'public-event',component:PublicEventPage,meta:{public:true}},
+    {path:'/e/:id/confirmation/:token',name:'public-confirmation',component:PublicConfirmationPage,meta:{public:true}},
     {path:'/',component:AppShell,children:[
       {path:'',name:'dashboard',component:DashboardPage},
       {path:'events',name:'events',component:EventsPage},
