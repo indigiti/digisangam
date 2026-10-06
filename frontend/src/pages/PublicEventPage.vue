@@ -7,7 +7,7 @@ import PublicRegistrationField from '../components/PublicRegistrationField.vue'
 const route=useRoute(),router=useRouter()
 const loading=ref(true),busy=ref(false),error=ref(''),data=ref(null),step=ref(1),selectedTicket=ref('')
 const previewMode=computed(()=>route.name==='event-preview')
-const answers=reactive({}),honeypot=ref('')
+const answers=reactive({}),honeypot=ref(''),uploadingField=ref('')
 const money=n=>Number(n||0)===0?'Free':new Intl.NumberFormat('en-IN',{style:'currency',currency:data.value?.event?.currency||'INR',maximumFractionDigits:0}).format(n)
 const selected=computed(()=>data.value?.tickets?.find(x=>x.id===selectedTicket.value)||null)
 const fields=computed(()=>data.value?.registration?.fields||[])
@@ -22,6 +22,15 @@ onMounted(async()=>{
   finally{loading.value=false}
 })
 
+async function uploadField(field,file){
+  uploadingField.value=field.id
+  error.value=''
+  try{
+    const media=await api.publicUploadMedia(route.params.id,file,'registration_file')
+    answers[field.id]=media.id
+  }catch(e){error.value=e.message}
+  finally{uploadingField.value=''}
+}
 function visible(field){
   if(field.visibility!=='conditional'||!field.condition) return true
   const source=answers[field.condition.field]
@@ -120,7 +129,7 @@ async function submit(){
         <section class="rounded-[24px] border border-slate-200 bg-white p-5 shadow-sm sm:p-7">
           <div v-if="step===1"><p class="text-xs font-black uppercase tracking-widest text-indigo-600">Step 1</p><h2 class="mt-2 text-2xl font-black">Choose your ticket</h2><p class="mt-2 text-sm text-slate-500">Select one available ticket type for this registration.</p><div class="mt-6 grid gap-3"><button v-for="ticket in data.tickets" :key="ticket.id" @click="selectedTicket=ticket.id" class="grid gap-3 rounded-2xl border p-4 text-left transition sm:grid-cols-[1fr_auto] sm:items-center" :class="selectedTicket===ticket.id?'border-indigo-500 bg-indigo-50 ring-4 ring-indigo-50':'border-slate-200 hover:border-indigo-200'"><div><div class="flex items-center gap-2"><h3 class="font-black">{{ticket.name}}</h3><span v-if="ticket.quantity-ticket.sold<25" class="rounded-full bg-amber-50 px-2 py-1 text-[10px] font-bold text-amber-700">Only {{ticket.quantity-ticket.sold}} left</span></div><p class="mt-1 text-xs text-slate-500">{{ticket.quantity-ticket.sold}} of {{ticket.quantity}} available</p></div><strong class="text-xl">{{money(ticket.price)}}</strong></button><div v-if="!data.tickets.length" class="rounded-2xl bg-amber-50 p-5 text-sm text-amber-800">No tickets are currently available.</div></div></div>
 
-          <div v-else-if="step===2"><p class="text-xs font-black uppercase tracking-widest text-indigo-600">Step 2</p><h2 class="mt-2 text-2xl font-black">{{data.registration.title}}</h2><p class="mt-2 text-sm text-slate-500">Fields marked with * are required.</p><div class="mt-7 grid gap-5 sm:grid-cols-2"><template v-for="field in fields" :key="field.id"><PublicRegistrationField v-if="visible(field)" v-model="answers[field.id]" :field="field" :categories="data.registration.categories" :class="['paragraph','textarea','file'].includes(field.type)?'sm:col-span-2':''"/></template><label class="hidden"><span>Website</span><input v-model="honeypot" tabindex="-1" autocomplete="off"/></label></div></div>
+          <div v-else-if="step===2"><p class="text-xs font-black uppercase tracking-widest text-indigo-600">Step 2</p><h2 class="mt-2 text-2xl font-black">{{data.registration.title}}</h2><p class="mt-2 text-sm text-slate-500">Fields marked with * are required.</p><div class="mt-7 grid gap-5 sm:grid-cols-2"><template v-for="field in fields" :key="field.id"><PublicRegistrationField v-if="visible(field)" v-model="answers[field.id]" :field="field" :categories="data.registration.categories" :class="['paragraph','textarea','file'].includes(field.type)?'sm:col-span-2':''" @upload="uploadField(field,$event)"/><p v-if="field.type==='file'&&uploadingField===field.id" class="sm:col-span-2 text-xs font-semibold text-indigo-600">Uploading file…</p></template><label class="hidden"><span>Website</span><input v-model="honeypot" tabindex="-1" autocomplete="off"/></label></div></div>
 
           <div v-else><p class="text-xs font-black uppercase tracking-widest text-indigo-600">Step 3</p><h2 class="mt-2 text-2xl font-black">Review & checkout</h2><div class="mt-6 rounded-2xl border border-slate-200 p-5"><div class="flex items-center justify-between"><div><p class="text-xs font-bold uppercase text-slate-400">Ticket</p><h3 class="mt-1 font-black">{{selected?.name}}</h3></div><strong class="text-xl">{{money(selected?.price)}}</strong></div></div><div class="mt-4 divide-y divide-slate-100 rounded-2xl border border-slate-200 px-5"><div v-for="field in fields.filter(visible)" :key="field.id" class="flex justify-between gap-6 py-3 text-sm"><span class="text-slate-500">{{field.label}}</span><b class="text-right">{{Array.isArray(answers[field.id])?answers[field.id].join(', '):(answers[field.id]||'—')}}</b></div></div><div v-if="Number(selected?.price||0)>0" class="mt-4 rounded-2xl bg-indigo-50 p-4 text-sm text-indigo-800"><b>Secure payment.</b> If Razorpay is configured, its checkout opens after registration. Otherwise the registration is saved as payment pending and no entry QR is issued.</div><div v-else class="mt-4 rounded-2xl bg-emerald-50 p-4 text-sm text-emerald-800">This is a free ticket. Your signed QR credential is issued immediately unless organizer approval is required.</div></div>
 
