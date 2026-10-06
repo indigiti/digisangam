@@ -64,8 +64,11 @@ final class CampaignDispatchService
 
         $updated=$this->campaigns->update($campaignId,[
             'status'=>$scheduled?'scheduled':'queued',
-            'sent_count'=>$queued,
-            'failed_count'=>$skipped,
+            'queued_count'=>$queued,
+            'sent_count'=>0,
+            'simulated_count'=>0,
+            'failed_count'=>0,
+            'skipped_count'=>$skipped,
         ]);
 
         return ['campaign'=>$updated??$campaign,'matched'=>count($recipients),'queued'=>$queued,'skipped'=>$skipped,'not_before'=>$notBefore];
