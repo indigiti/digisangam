@@ -32,6 +32,8 @@ use DigiSangam\Credentials\CredentialService;
 use DigiSangam\Events\EventRepository;
 use DigiSangam\Invitations\InvitationRepository;
 use DigiSangam\Intelligence\EventGraphBuilder;
+use DigiSangam\Intelligence\ActionProposalRepository;
+use DigiSangam\Intelligence\ApprovedActionService;
 use DigiSangam\Intelligence\IntelligenceClient;
 use DigiSangam\Notifications\NotificationOutbox;
 use DigiSangam\Payments\PaymentService;
@@ -346,6 +348,34 @@ try {
             'question_hash'=>hash('sha256',$question),
         ]);
         JsonResponse::send($result);
+    }
+
+    if ($method === 'GET' && $path === '/intelligence/actions') {
+        $auth->requirePermission('intelligence.view');
+        JsonResponse::send((new ActionProposalRepository($store))->all());
+    }
+
+    if ($method === 'POST' && $path === '/intelligence/actions') {
+        $user=$auth->requirePermission('intelligence.use');
+        $record=(new ActionProposalRepository($store))->create($body(),(string)$user['id']);
+        $journal->append('intelligence.action_proposed',['proposal_id'=>$record['id'],'type'=>$record['type']]);
+        JsonResponse::send($record,201);
+    }
+
+    if ($method === 'POST' && preg_match('#^/intelligence/actions/([^/]+)/(approve|reject)$#',$path,$m)) {
+        $user=$auth->requirePermission('intelligence.manage');
+        $decision=$m[2]==='approve'?'approved':'rejected';
+        $repo=new ActionProposalRepository($store);
+        $record=$repo->decide($m[1],$decision,(string)$user['id']);
+        if(!$record) JsonResponse::send(['error'=>'Action proposal not found.'],404);
+        if($decision==='approved'){
+            $result=(new ApprovedActionService($store))->execute($record);
+            $record=$repo->attachResult($m[1],$result) ?? $record;
+            $journal->append('intelligence.action_approved',['proposal_id'=>$m[1],'type'=>$record['type']]);
+        }else{
+            $journal->append('intelligence.action_rejected',['proposal_id'=>$m[1],'type'=>$record['type']]);
+        }
+        JsonResponse::send($record);
     }
 
     $events = new EventRepository($store);
