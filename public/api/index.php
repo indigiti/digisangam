@@ -552,6 +552,12 @@ try {
         }
     }
 
+    if($method==='GET' && preg_match('#^/events/([^/]+)/preview$#',$path,$m)){
+        $auth->requirePermission('events.view');
+        $requireEvent($m[1]);
+        JsonResponse::send($publicFlow()->previewEvent($m[1]));
+    }
+
     $registration = new RegistrationRepository($store);
     if (preg_match('#^/events/([^/]+)/registration$#', $path, $m)) {
         $eventId=$m[1];
