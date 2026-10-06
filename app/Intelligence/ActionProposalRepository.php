@@ -22,7 +22,7 @@ final class ActionProposalRepository
         }
         $record=[
             'id'=>'aip_'.bin2hex(random_bytes(6)),
-            'event_id'=>(string)($input['event_id']??'evt_001'),
+            'event_id'=>trim((string)($input['event_id']??'')),
             'type'=>$type,
             'title'=>trim((string)($input['title']??'AI suggested action')),
             'rationale'=>trim((string)($input['rationale']??'')),
@@ -31,6 +31,7 @@ final class ActionProposalRepository
             'created_by'=>$createdBy,
             'created_at'=>date(DATE_ATOM),
         ];
+        if($record['event_id']==='') throw new \InvalidArgumentException('Event is required.');
         $rows=$this->all();array_unshift($rows,$record);
         $this->store->write('intelligence/actions.json',$rows);
         return $record;
