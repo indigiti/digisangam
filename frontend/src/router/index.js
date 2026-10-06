@@ -4,6 +4,7 @@ import AccessPage from '../pages/AccessPage.vue'
 import DashboardPage from '../pages/DashboardPage.vue'
 import EventsPage from '../pages/EventsPage.vue'
 import EventCreatePage from '../pages/EventCreatePage.vue'
+import EventDetailPage from '../pages/EventDetailPage.vue'
 import RegistrationBuilderPage from '../pages/RegistrationBuilderPage.vue'
 import AttendeesPage from '../pages/AttendeesPage.vue'
 import TicketsPage from '../pages/TicketsPage.vue'
@@ -20,6 +21,7 @@ export default createRouter({
       {path:'',name:'dashboard',component:DashboardPage},
       {path:'events',name:'events',component:EventsPage},
       {path:'events/create',name:'event-create',component:EventCreatePage},
+      {path:'events/:id',name:'event-detail',component:EventDetailPage},
       {path:'registrations',name:'registrations',component:RegistrationBuilderPage},
       {path:'attendees',name:'attendees',component:AttendeesPage},
       {path:'tickets',name:'tickets',component:TicketsPage},
