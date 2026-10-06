@@ -116,6 +116,11 @@ export const api={
   updateAccreditation:(id,payload)=>request('/accreditation/'+encodeURIComponent(id),{method:'PATCH',body:JSON.stringify(payload)}),
   walkIn:(payload)=>request('/onground/walk-in',{method:'POST',body:JSON.stringify(payload)}),
   reports:(eventId)=>request('/reports?event_id='+encodeURIComponent(eventId)),
+  reportDefinitions:(eventId)=>request('/report-definitions?event_id='+encodeURIComponent(eventId)),
+  createReportDefinition:(payload)=>request('/report-definitions',{method:'POST',body:JSON.stringify(payload)}),
+  updateReportDefinition:(id,payload)=>request('/report-definitions/'+encodeURIComponent(id),{method:'PATCH',body:JSON.stringify(payload)}),
+  deleteReportDefinition:(id)=>request('/report-definitions/'+encodeURIComponent(id),{method:'DELETE'}),
+  reportDefinitionExportUrl:(id)=>apiBase+'/reports/export-definition/'+encodeURIComponent(id),
   reportExportUrl:(eventId,type)=>apiBase+'/reports/export?event_id='+encodeURIComponent(eventId)+'&type='+encodeURIComponent(type),
   eventBlueprint:(prompt)=>request('/intelligence/event-builder',{method:'POST',body:JSON.stringify({prompt})}),
   uploadMedia:(eventId,file,kind='asset',isPublic=true)=>{
