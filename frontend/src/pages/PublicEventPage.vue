@@ -6,6 +6,7 @@ import PublicRegistrationField from '../components/PublicRegistrationField.vue'
 
 const route=useRoute(),router=useRouter()
 const loading=ref(true),busy=ref(false),error=ref(''),data=ref(null),step=ref(1),selectedTicket=ref('')
+const previewMode=computed(()=>route.name==='event-preview')
 const answers=reactive({}),honeypot=ref('')
 const money=n=>Number(n||0)===0?'Free':new Intl.NumberFormat('en-IN',{style:'currency',currency:data.value?.event?.currency||'INR',maximumFractionDigits:0}).format(n)
 const selected=computed(()=>data.value?.tickets?.find(x=>x.id===selectedTicket.value)||null)
@@ -13,7 +14,7 @@ const fields=computed(()=>data.value?.registration?.fields||[])
 
 onMounted(async()=>{
   try{
-    data.value=await api.publicEvent(route.params.id)
+    data.value=previewMode.value?await api.eventPreview(route.params.id):await api.publicEvent(route.params.id)
     for(const field of fields.value) answers[field.id]=field.type==='multiselect'?[]:''
     const category=fields.value.find(x=>x.id==='fld_category')
     if(category&&data.value.registration.categories?.length) answers[category.id]=data.value.registration.categories[0]
@@ -99,6 +100,7 @@ async function submit(){
 </script>
 <template>
 <main class="min-h-screen bg-[#f5f7fb] text-slate-950">
+  <div v-if="previewMode" class="sticky top-0 z-50 flex items-center justify-between gap-3 bg-amber-400 px-4 py-2 text-sm font-bold text-amber-950"><span>Admin preview · this event is not being registered through this screen.</span><RouterLink :to="'/events/'+route.params.id" class="rounded-lg bg-amber-950 px-3 py-1.5 text-xs text-white">Back to event</RouterLink></div>
   <div v-if="loading" class="grid min-h-screen place-items-center"><div class="h-10 w-10 animate-spin rounded-full border-4 border-indigo-200 border-t-indigo-600"></div></div>
   <div v-else-if="error&&!data" class="grid min-h-screen place-items-center p-6"><div class="max-w-md text-center"><div class="mx-auto grid h-14 w-14 place-items-center rounded-2xl bg-rose-50 text-xl text-rose-600">!</div><h1 class="mt-4 text-2xl font-black">Registration unavailable</h1><p class="mt-2 text-sm text-slate-500">{{error}}</p></div></div>
   <template v-else-if="data">
@@ -123,7 +125,7 @@ async function submit(){
           <div v-else><p class="text-xs font-black uppercase tracking-widest text-indigo-600">Step 3</p><h2 class="mt-2 text-2xl font-black">Review & checkout</h2><div class="mt-6 rounded-2xl border border-slate-200 p-5"><div class="flex items-center justify-between"><div><p class="text-xs font-bold uppercase text-slate-400">Ticket</p><h3 class="mt-1 font-black">{{selected?.name}}</h3></div><strong class="text-xl">{{money(selected?.price)}}</strong></div></div><div class="mt-4 divide-y divide-slate-100 rounded-2xl border border-slate-200 px-5"><div v-for="field in fields.filter(visible)" :key="field.id" class="flex justify-between gap-6 py-3 text-sm"><span class="text-slate-500">{{field.label}}</span><b class="text-right">{{Array.isArray(answers[field.id])?answers[field.id].join(', '):(answers[field.id]||'—')}}</b></div></div><div v-if="Number(selected?.price||0)>0" class="mt-4 rounded-2xl bg-indigo-50 p-4 text-sm text-indigo-800"><b>Secure payment.</b> If Razorpay is configured, its checkout opens after registration. Otherwise the registration is saved as payment pending and no entry QR is issued.</div><div v-else class="mt-4 rounded-2xl bg-emerald-50 p-4 text-sm text-emerald-800">This is a free ticket. Your signed QR credential is issued immediately unless organizer approval is required.</div></div>
 
           <p v-if="error" class="mt-5 rounded-xl bg-rose-50 p-3 text-sm font-semibold text-rose-700">{{error}}</p>
-          <div class="mt-8 flex justify-between border-t border-slate-100 pt-5"><button v-if="step>1" class="rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-bold" @click="step--">← Back</button><span v-else></span><button v-if="step<3" class="rounded-xl bg-indigo-600 px-5 py-2.5 text-sm font-bold text-white shadow-lg shadow-indigo-100" @click="next">Continue →</button><button v-else class="rounded-xl bg-indigo-600 px-5 py-2.5 text-sm font-bold text-white shadow-lg shadow-indigo-100 disabled:opacity-50" :disabled="busy" @click="submit">{{busy?'Processing…':(Number(selected?.price||0)>0?'Register & Pay':'Complete registration')}}</button></div>
+          <div class="mt-8 flex justify-between border-t border-slate-100 pt-5"><button v-if="step>1" class="rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-bold" @click="step--">← Back</button><span v-else></span><button v-if="step<3" class="rounded-xl bg-indigo-600 px-5 py-2.5 text-sm font-bold text-white shadow-lg shadow-indigo-100" @click="next">Continue →</button><button v-else class="rounded-xl bg-indigo-600 px-5 py-2.5 text-sm font-bold text-white shadow-lg shadow-indigo-100 disabled:opacity-50" :disabled="busy||previewMode" @click="submit">{{previewMode?'Preview only':(busy?'Processing…':(Number(selected?.price||0)>0?'Register & Pay':'Complete registration'))}}</button></div>
         </section>
 
         <aside class="space-y-4"><div class="rounded-[24px] border border-slate-200 bg-white p-5 shadow-sm"><p class="text-xs font-black uppercase tracking-widest text-slate-400">Event summary</p><h3 class="mt-3 text-lg font-black">{{data.event.name}}</h3><div class="mt-4 space-y-3 text-sm text-slate-600"><p>◷ {{data.event.start_date||data.event.date}}</p><p>⌖ {{data.event.location}}</p><p>◎ {{data.registration.approval_mode==='manual'?'Manual approval':data.registration.approval_mode==='invite_only'?'Invitation only':'Instant approval'}}</p></div></div><div class="rounded-[24px] bg-slate-950 p-5 text-white"><p class="text-xs font-black uppercase tracking-widest text-cyan-300">Secure registration</p><p class="mt-3 text-sm leading-6 text-slate-300">Signed credentials, payment verification, inventory locks and private confirmation links are handled by DigiSangam EventOS.</p></div></aside>
