@@ -21,6 +21,10 @@ import AgendaPage from '../pages/AgendaPage.vue'
 import ExhibitorsPage from '../pages/ExhibitorsPage.vue'
 import VenuePage from '../pages/VenuePage.vue'
 import SettingsPage from '../pages/SettingsPage.vue'
+import DeveloperPage from '../pages/DeveloperPage.vue'
+import EventBuilderPage from '../pages/EventBuilderPage.vue'
+import ReportsPage from '../pages/ReportsPage.vue'
+import AccreditationPage from '../pages/AccreditationPage.vue'
 
 export default createRouter({
   history:createWebHistory(import.meta.env.BASE_URL),
@@ -44,9 +48,13 @@ export default createRouter({
       {path:'exhibitors',name:'exhibitors',component:ExhibitorsPage},
       {path:'venue',name:'venue',component:VenuePage},
       {path:'onground',name:'onground',component:OnGroundPage},
+      {path:'accreditation',name:'accreditation',component:AccreditationPage},
       {path:'commerce',name:'commerce',component:CommercePage},
       {path:'analytics',name:'analytics',component:AnalyticsPage},
+      {path:'reports',name:'reports',component:ReportsPage},
       {path:'intelligence',name:'intelligence',component:IntelligencePage},
+      {path:'event-builder',name:'event-builder',component:EventBuilderPage},
+      {path:'developer',name:'developer',component:DeveloperPage},
       {path:'settings',name:'settings',component:SettingsPage},
     ]}
   ]
