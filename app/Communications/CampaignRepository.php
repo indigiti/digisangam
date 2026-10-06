@@ -22,7 +22,7 @@ final class CampaignRepository
         $timezone=trim((string)($input['timezone']??'UTC'))?:'UTC';
         if($eventId==='') throw new \InvalidArgumentException('Event is required.');
         if($name==='') throw new \InvalidArgumentException('Campaign name is required.');
-        if(!in_array($channel,['email','whatsapp'],true)) throw new \InvalidArgumentException('Unsupported campaign channel.');
+        if(!in_array($channel,['email','whatsapp','sms'],true)) throw new \InvalidArgumentException('Unsupported campaign channel.');
         try{new \DateTimeZone($timezone);}catch(\Throwable){throw new \InvalidArgumentException('Invalid campaign timezone.');}
 
         $record=[
