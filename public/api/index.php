@@ -87,6 +87,16 @@ $forEvent=static function(array $rows,string $eventId): array {
     return array_values(array_filter($rows,static fn(array $row): bool => ($row['event_id']??'')===$eventId));
 };
 
+$eventView=static function(array $event) use ($store): array {
+    $eventId=(string)($event['id']??'');
+    $attendees=array_values(array_filter((new AttendeeRepository($store))->all(),static fn(array $row): bool => ($row['event_id']??'')===$eventId));
+    $orders=array_values(array_filter((new OrderRepository($store))->all(),static fn(array $row): bool => ($row['event_id']??'')===$eventId));
+    $event['registrations']=count($attendees);
+    $event['confirmed']=count(array_filter($attendees,static fn(array $row): bool => ($row['status']??'')==='Confirmed'));
+    $event['revenue']=array_sum(array_map(static fn(array $row): int => ($row['status']??'')==='paid'?(int)($row['amount']??0):0,$orders));
+    return $event;
+};
+
 $credentialSecret = static function () use ($store): string {
     $env = trim((string)getenv('DIGISANGAM_CREDENTIAL_SECRET'));
     if ($env !== '') return $env;
@@ -410,7 +420,7 @@ try {
     $events = new EventRepository($store);
     if ($method === 'GET' && $path === '/events') {
         $auth->requirePermission('events.view');
-        JsonResponse::send($events->all());
+        JsonResponse::send(array_map($eventView,$events->all()));
     }
     if ($method === 'POST' && $path === '/events') {
         $auth->requirePermission('events.manage');
@@ -470,7 +480,7 @@ try {
         if ($method === 'GET') {
             $auth->requirePermission('events.view');
             $event = $events->find($eventId);
-            JsonResponse::send($event ?? ['error'=>'Event not found.'], $event ? 200 : 404);
+            JsonResponse::send($event ? $eventView($event) : ['error'=>'Event not found.'], $event ? 200 : 404);
         }
         if (in_array($method, ['PUT','PATCH'], true)) {
             $auth->requirePermission('events.manage');
