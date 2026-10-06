@@ -39,7 +39,7 @@ final class OrderRepository
         $amount = max(0, (int)($input['amount'] ?? 0));
         $record = [
             'id'=>'ord_'.date('Ymd').'_'.bin2hex(random_bytes(4)),
-            'event_id'=>(string)($input['event_id'] ?? 'evt_001'),
+            'event_id'=>trim((string)($input['event_id'] ?? '')),
             'attendee_id'=>(string)($input['attendee_id'] ?? ''),
             'ticket_id'=>(string)($input['ticket_id'] ?? ''),
             'amount'=>$amount,
@@ -50,6 +50,7 @@ final class OrderRepository
             'provider_order_id'=>(string)($input['provider_order_id'] ?? ''),
             'created_at'=>date(DATE_ATOM),
         ];
+        if(($record['event_id']??'')==='') throw new \InvalidArgumentException('Event is required.');
         array_unshift($rows, $record);
         $this->store->write('orders/index.json', $rows);
         return $record;
