@@ -1,17 +1,21 @@
 <script setup>
-import { computed, onMounted, reactive, ref } from 'vue'
+import { computed, onMounted, reactive, ref, watch } from 'vue'
+import { useEventStore } from '../stores/event'
 import { api } from '../services/api'
 
-const rows=ref([]),show=ref(false),busy=ref(false),result=ref(null)
-const form=reactive({event_id:'evt_001',name:'Attendee Update',channel:'email',template:'custom_campaign',subject:'Event update',content:'We have an important update for you.',segment:{status:'Confirmed',category:''},schedule_at:'',status:'draft'})
-onMounted(async()=>rows.value=await api.campaigns())
+const events=useEventStore(),rows=ref([]),show=ref(false),busy=ref(false),result=ref(null),error=ref('')
+const eventId=computed(()=>events.currentId)
+const form=reactive({event_id:'',name:'Attendee Update',channel:'email',template:'custom_campaign',subject:'Event update',content:'We have an important update for you.',segment:{status:'Confirmed',category:''},schedule_at:'',status:'draft'})
+async function load(){if(!events.loaded)await events.load();rows.value=eventId.value?await api.campaigns(eventId.value):[]}
+onMounted(load);watch(eventId,load)
 const scheduled=computed(()=>rows.value.filter(x=>['scheduled','queued'].includes(x.status)).length)
 const delivered=computed(()=>rows.value.reduce((n,x)=>n+Number(x.sent_count||0),0))
-async function create(){busy.value=true;try{const row=await api.createCampaign(form);rows.value.unshift(row);show.value=false}catch{}finally{busy.value=false}}
-async function dispatch(row){busy.value=true;result.value=null;try{const r=await api.dispatchCampaign(row.id);Object.assign(row,r.campaign);result.value=r}finally{busy.value=false}}
+async function create(){busy.value=true;error.value='';try{form.event_id=eventId.value;const row=await api.createCampaign(form);rows.value.unshift(row);show.value=false}catch(e){error.value=e.message}finally{busy.value=false}}
+async function dispatch(row){busy.value=true;result.value=null;error.value='';try{const r=await api.dispatchCampaign(row.id);Object.assign(row,r.campaign);result.value=r}catch(e){error.value=e.message}finally{busy.value=false}}
 </script>
 <template><div class="space-y-6">
-<section class="flex flex-col justify-between gap-4 sm:flex-row sm:items-end"><div><p class="eyebrow">Communications</p><h1 class="page-title">Communication Center</h1><p class="page-subtitle">Email and WhatsApp campaigns share the production notification outbox and provider adapters.</p></div><button class="btn-primary" @click="show=true">+ New Campaign</button></section>
+<section class="flex flex-col justify-between gap-4 sm:flex-row sm:items-end"><div><p class="eyebrow">Communications</p><h1 class="page-title">Communication Center</h1><p class="page-subtitle">{{events.current?.name||'Select an event'}} · email and WhatsApp campaigns.</p></div><button class="btn-primary" :disabled="!eventId" @click="show=true">+ New Campaign</button></section>
+<p v-if="error" class="rounded-xl bg-rose-50 p-4 text-sm font-semibold text-rose-700">{{error}}</p>
 <section class="grid gap-4 sm:grid-cols-3"><article class="panel p-5"><p class="panel-kicker">Campaigns</p><p class="mt-2 text-2xl font-black">{{rows.length}}</p></article><article class="panel p-5"><p class="panel-kicker">Queued / scheduled</p><p class="mt-2 text-2xl font-black">{{scheduled}}</p></article><article class="panel p-5"><p class="panel-kicker">Messages queued</p><p class="mt-2 text-2xl font-black">{{delivered}}</p></article></section>
 <p v-if="result" class="rounded-2xl bg-emerald-50 p-4 text-sm font-semibold text-emerald-800">Matched {{result.matched}} attendees; {{result.queued}} messages queued and {{result.skipped}} skipped.</p>
 <section class="panel overflow-hidden"><div class="overflow-x-auto"><table class="data-table"><thead><tr><th>Campaign</th><th>Channel</th><th>Segment</th><th>Schedule</th><th>Status</th><th>Queued</th><th></th></tr></thead><tbody><tr v-if="!rows.length"><td colspan="7" class="text-center">No campaigns yet.</td></tr><tr v-for="r in rows" :key="r.id"><td><b>{{r.name}}</b><p>{{r.subject||r.template}}</p></td><td><span class="soft-pill">{{r.channel}}</span></td><td>{{r.segment?.status||'Any'}}<span v-if="r.segment?.category"> · {{r.segment.category}}</span></td><td>{{r.schedule_at||'Now'}}</td><td><span class="status-badge" :class="r.status==='draft'?'badge-draft':'badge-published'">{{r.status}}</span></td><td>{{r.sent_count||0}}</td><td><button class="btn-secondary py-1.5" :disabled="busy" @click="dispatch(r)">Queue</button></td></tr></tbody></table></div></section>
