@@ -9,17 +9,22 @@ final class CheckinRepository
 {
     public function __construct(private readonly JsonFileStore $store) {}
 
+    public function all(string $eventId): array
+    {
+        return $this->store->read('checkins/'.$eventId.'.json',[]);
+    }
+
     public function find(string $eventId,string $attendeeId): ?array
     {
-        foreach($this->store->read('checkins/'.$eventId.'.json',[]) as $row){
+        foreach($this->all($eventId) as $row){
             if(($row['attendee_id']??'')===$attendeeId) return $row;
         }
         return null;
     }
 
-    public function checkin(string $eventId,string $attendeeId,string $operatorId=''): array
+    public function checkin(string $eventId,string $attendeeId,string $operatorId='',string $zoneId=''): array
     {
-        return $this->store->transaction('checkins/'.$eventId.'.json',static function(array $rows) use ($eventId,$attendeeId,$operatorId): array {
+        return $this->store->transaction('checkins/'.$eventId.'.json',static function(array $rows) use ($eventId,$attendeeId,$operatorId,$zoneId): array {
             foreach($rows as $row){
                 if(($row['attendee_id']??'')===$attendeeId){
                     return ['data'=>$rows,'result'=>['already_checked_in'=>true,'checkin'=>$row]];
@@ -30,6 +35,7 @@ final class CheckinRepository
                 'event_id'=>$eventId,
                 'attendee_id'=>$attendeeId,
                 'operator_id'=>$operatorId,
+                'zone_id'=>$zoneId,
                 'checked_in_at'=>date(DATE_ATOM),
             ];
             array_unshift($rows,$record);
