@@ -1,20 +1,24 @@
 <script setup>
-import { computed, onMounted, reactive, ref } from 'vue'
+import { computed, onMounted, reactive, ref, watch } from 'vue'
+import { useEventStore } from '../stores/event'
 import { api } from '../services/api'
-const rows=ref([]),leads=ref([]),meetings=ref([]),show=ref(false),showLead=ref(false),showMeeting=ref(false),busy=ref(false),q=ref(''),tab=ref('companies')
-const form=reactive({event_id:'evt_001',name:'',type:'Exhibitor',booth:'',contact_name:'',contact_email:'',staff_quota:5,lead_quota:250,status:'active'})
-const lead=reactive({event_id:'evt_001',exhibitor_id:'',attendee_id:'',score:60,intent:'warm',notes:'',owner:''})
-const meeting=reactive({event_id:'evt_001',exhibitor_id:'',attendee_id:'',start_at:'2026-10-12T14:00',duration_minutes:30,location:'Meeting Lounge',status:'scheduled'})
-onMounted(async()=>{[rows.value,leads.value,meetings.value]=await Promise.all([api.exhibitors(),api.leads(),api.meetings()])})
+const events=useEventStore(),rows=ref([]),leads=ref([]),meetings=ref([]),show=ref(false),showLead=ref(false),showMeeting=ref(false),busy=ref(false),q=ref(''),tab=ref('companies'),error=ref('')
+const eventId=computed(()=>events.currentId)
+const form=reactive({event_id:'',name:'',type:'Exhibitor',booth:'',contact_name:'',contact_email:'',staff_quota:5,lead_quota:250,status:'active'})
+const lead=reactive({event_id:'',exhibitor_id:'',attendee_id:'',score:60,intent:'warm',notes:'',owner:''})
+const meeting=reactive({event_id:'',exhibitor_id:'',attendee_id:'',start_at:'2026-10-12T14:00',duration_minutes:30,location:'Meeting Lounge',status:'scheduled'})
+async function load(){if(!events.loaded)await events.load();if(!eventId.value){rows.value=[];leads.value=[];meetings.value=[];return};[rows.value,leads.value,meetings.value]=await Promise.all([api.exhibitors(eventId.value),api.leads(eventId.value),api.meetings(eventId.value)])}
+onMounted(load);watch(eventId,load)
 const filtered=computed(()=>rows.value.filter(x=>(x.name+x.booth+x.type).toLowerCase().includes(q.value.toLowerCase())))
 const sponsors=computed(()=>rows.value.filter(x=>x.type==='Sponsor').length)
 const companyName=id=>rows.value.find(x=>x.id===id)?.name||id
-async function create(){busy.value=true;try{const row=await api.createExhibitor(form);rows.value.unshift(row);show.value=false}finally{busy.value=false}}
-async function captureLead(){busy.value=true;try{leads.value.unshift(await api.createLead(lead));showLead.value=false}finally{busy.value=false}}
-async function bookMeeting(){busy.value=true;try{meetings.value.unshift(await api.createMeeting(meeting));showMeeting.value=false}finally{busy.value=false}}
+async function create(){busy.value=true;error.value='';try{form.event_id=eventId.value;const row=await api.createExhibitor(form);rows.value.unshift(row);show.value=false}catch(e){error.value=e.message}finally{busy.value=false}}
+async function captureLead(){busy.value=true;error.value='';try{lead.event_id=eventId.value;leads.value.unshift(await api.createLead(lead));showLead.value=false}catch(e){error.value=e.message}finally{busy.value=false}}
+async function bookMeeting(){busy.value=true;error.value='';try{meeting.event_id=eventId.value;meetings.value.unshift(await api.createMeeting(meeting));showMeeting.value=false}catch(e){error.value=e.message}finally{busy.value=false}}
 </script>
 <template><div class="space-y-6">
-<section class="flex flex-col justify-between gap-4 sm:flex-row sm:items-end"><div><p class="eyebrow">Marketplace</p><h1 class="page-title">Exhibitors & Sponsors</h1><p class="page-subtitle">Booths, staff entitlements, lead capture and meeting scheduling in one operating workspace.</p></div><div class="flex flex-wrap gap-2"><button class="btn-secondary" @click="showLead=true">+ Capture Lead</button><button class="btn-secondary" @click="showMeeting=true">+ Book Meeting</button><button class="btn-primary" @click="show=true">+ Add Company</button></div></section>
+<section class="flex flex-col justify-between gap-4 sm:flex-row sm:items-end"><div><p class="eyebrow">Marketplace</p><h1 class="page-title">Exhibitors & Sponsors</h1><p class="page-subtitle">{{events.current?.name||'Select an event'}} · companies, leads and meetings.</p></div><div class="flex flex-wrap gap-2"><button class="btn-secondary" :disabled="!eventId||!rows.length" @click="showLead=true">+ Capture Lead</button><button class="btn-secondary" :disabled="!eventId||!rows.length" @click="showMeeting=true">+ Book Meeting</button><button class="btn-primary" :disabled="!eventId" @click="show=true">+ Add Company</button></div></section>
+<p v-if="error" class="rounded-xl bg-rose-50 p-4 text-sm font-semibold text-rose-700">{{error}}</p>
 <section class="grid gap-4 sm:grid-cols-4"><article class="panel p-5"><p class="panel-kicker">Companies</p><p class="mt-2 text-2xl font-black">{{rows.length}}</p></article><article class="panel p-5"><p class="panel-kicker">Sponsors</p><p class="mt-2 text-2xl font-black">{{sponsors}}</p></article><article class="panel p-5"><p class="panel-kicker">Leads</p><p class="mt-2 text-2xl font-black">{{leads.length}}</p></article><article class="panel p-5"><p class="panel-kicker">Meetings</p><p class="mt-2 text-2xl font-black">{{meetings.length}}</p></article></section>
 <div class="flex gap-1 border-b border-slate-200"><button v-for="t in ['companies','leads','meetings']" :key="t" class="tab-btn capitalize" :class="{active:tab===t}" @click="tab=t">{{t}}</button></div>
 <section v-if="tab==='companies'" class="panel overflow-hidden"><div class="border-b p-4"><input v-model="q" class="control max-w-md" placeholder="Search company or booth…"/></div><div class="overflow-x-auto"><table class="data-table"><thead><tr><th>Company</th><th>Type</th><th>Booth</th><th>Contact</th><th>Staff</th><th>Lead quota</th><th>Status</th></tr></thead><tbody><tr v-for="r in filtered" :key="r.id"><td><b>{{r.name}}</b></td><td><span class="soft-pill">{{r.type}}</span></td><td class="font-mono">{{r.booth||'—'}}</td><td>{{r.contact_name}}<p>{{r.contact_email}}</p></td><td>{{r.staff_quota}}</td><td>{{r.lead_quota}}</td><td><span class="status-badge badge-published">{{r.status}}</span></td></tr></tbody></table></div></section>
