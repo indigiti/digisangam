@@ -16,6 +16,7 @@ use DigiSangam\Exhibitors\LeadRepository;
 use DigiSangam\Exhibitors\MeetingRepository;
 use DigiSangam\Badges\PrintJobRepository;
 use DigiSangam\OnGround\OfflineSnapshotService;
+use DigiSangam\OnGround\AccessEventRepository;
 use DigiSangam\OnGround\AccessPolicyService;
 use DigiSangam\Venue\VenueRepository;
 use DigiSangam\Attendees\AttendeeRepository;
@@ -96,6 +97,7 @@ $scanner = static function () use ($store,$credentialSecret): ScannerService {
         new OrderRepository($store),
         new CheckinRepository($store),
         new AccessPolicyService(new VenueRepository($store)),
+        new AccessEventRepository($store),
     );
 };
 
