@@ -9,7 +9,7 @@ final class VenueRepository
 {
     public function __construct(private readonly JsonFileStore $store) {}
 
-    public function get(string $eventId='evt_001'): array
+    public function get(string $eventId): array
     {
         return $this->store->read('venue/'.$eventId.'.json', self::defaults($eventId));
     }
@@ -28,14 +28,7 @@ final class VenueRepository
     private static function defaults(string $eventId): array
     {
         return [
-            'event_id'=>$eventId,'name'=>'Convention Centre','address'=>'Mumbai, India',
-            'zones'=>[
-                ['id'=>'zone_general','name'=>'General Access','capacity'=>1500,'categories'=>['General','Media']],
-                ['id'=>'zone_vip','name'=>'VIP Lounge','capacity'=>150,'categories'=>['VIP','Speaker','Sponsor']],
-                ['id'=>'zone_stage','name'=>'Backstage','capacity'=>60,'categories'=>['Speaker','Sponsor']],
-            ],
-            'seating'=>[
-                ['id'=>'hall_main','name'=>'Main Hall','type'=>'reserved','rows'=>20,'seats_per_row'=>30],
+            'event_id'=>$eventId,'name'=>'','address'=>'','zones'=>[],'seating'=>[],
                 ['id'=>'hall_a','name'=>'Hall A','type'=>'general','capacity'=>250],
             ],
         ];
