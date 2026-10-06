@@ -1,5 +1,6 @@
 Options -Indexes
 Options -MultiViews
+DirectoryIndex index.html index.php
 RewriteEngine On
 RewriteBase /digisangam/
 
