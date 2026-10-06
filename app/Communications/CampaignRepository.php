@@ -18,7 +18,7 @@ final class CampaignRepository
     {
         $record=[
             'id'=>'cmp_'.bin2hex(random_bytes(6)),
-            'event_id'=>(string)($input['event_id']??'evt_001'),
+            'event_id'=>trim((string)($input['event_id'] ?? '')),
             'name'=>trim((string)($input['name']??'Untitled Campaign')),
             'channel'=>(string)($input['channel']??'email'),
             'template'=>(string)($input['template']??'custom_campaign'),
@@ -30,6 +30,7 @@ final class CampaignRepository
             'sent_count'=>0,'failed_count'=>0,
             'created_at'=>date(DATE_ATOM),
         ];
+        if(($record['event_id']??'')==='') throw new \InvalidArgumentException('Event is required.');
         $rows=$this->all(); array_unshift($rows,$record);
         $this->store->write('communications/campaigns.json',$rows);
         return $record;
