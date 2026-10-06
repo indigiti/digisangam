@@ -65,8 +65,12 @@ final class RegistrationCheckoutService
         if (!empty($input['website'])) throw new \InvalidArgumentException('Invalid submission.');
         $public = $this->publicEvent($eventId);
         $schema = $this->registration->schema($eventId);
-        $answers = is_array($input['answers'] ?? null) ? $input['answers'] : [];
-        $this->validateRequiredFields((array)($schema['fields'] ?? []), $answers);
+        $submitted = is_array($input['answers'] ?? null) ? $input['answers'] : [];
+        $answers = $this->validateAnswers(
+            (array)($schema['fields'] ?? []),
+            $submitted,
+            (array)($schema['categories'] ?? [])
+        );
 
         $email = strtolower(trim((string)($answers['fld_email'] ?? $input['email'] ?? '')));
         $name = trim((string)($answers['fld_name'] ?? $input['name'] ?? ''));
@@ -162,16 +166,56 @@ final class RegistrationCheckoutService
         ];
     }
 
-    private function validateRequiredFields(array $fields, array $answers): void
+    private function validateAnswers(array $fields,array $submitted,array $categories): array
     {
-        foreach ($fields as $field) {
-            if (!$this->isVisible($field,$answers) || empty($field['required'])) continue;
-            $id=(string)($field['id'] ?? '');
-            $value=$answers[$id] ?? null;
-            if ($value === null || $value === '' || $value === []) {
-                throw new \InvalidArgumentException(((string)($field['label'] ?? 'Required field')) . ' is required.');
+        $answers=[];
+        foreach($fields as $field){
+            $id=(string)($field['id']??'');
+            if($id==='') continue;
+            $value=$submitted[$id]??null;
+            $answers[$id]=$value;
+        }
+
+        foreach($fields as $field){
+            if(!$this->isVisible($field,$answers)) continue;
+            $id=(string)($field['id']??'');
+            $label=(string)($field['label']??'Field');
+            $type=(string)($field['type']??'text');
+            $value=$answers[$id]??null;
+
+            if(!empty($field['required']) && ($value===null||$value===''||$value===[])){
+                throw new \InvalidArgumentException($label.' is required.');
+            }
+            if($value===null||$value===''||$value===[]) continue;
+
+            if(is_string($value) && strlen($value)>20000) throw new \InvalidArgumentException($label.' is too long.');
+
+            if($type==='email' && !filter_var((string)$value,FILTER_VALIDATE_EMAIL)){
+                throw new \InvalidArgumentException($label.' must be a valid email.');
+            }
+            if($type==='phone'){
+                $phone=preg_replace('/[\s().-]+/','',(string)$value)??'';
+                if(!preg_match('/^\+?[0-9]{7,18}$/',$phone)) throw new \InvalidArgumentException($label.' must be a valid phone number.');
+                $answers[$id]=$phone;
+            }
+            if($type==='date' && !preg_match('/^\d{4}-\d{2}-\d{2}$/',(string)$value)){
+                throw new \InvalidArgumentException($label.' must be a valid date.');
+            }
+
+            if(in_array($type,['select','dropdown','radio'],true)){
+                $options=$id==='fld_category'?$categories:(array)($field['options']??[]);
+                if(!in_array((string)$value,array_map('strval',$options),true)) throw new \InvalidArgumentException($label.' contains an invalid option.');
+            }
+            if($type==='multiselect'){
+                if(!is_array($value)) throw new \InvalidArgumentException($label.' must contain a list of options.');
+                $allowed=array_map('strval',(array)($field['options']??[]));
+                foreach($value as $selected){
+                    if(!in_array((string)$selected,$allowed,true)) throw new \InvalidArgumentException($label.' contains an invalid option.');
+                }
+                $answers[$id]=array_values(array_unique(array_map('strval',$value)));
             }
         }
+        return $answers;
     }
 
     private function isVisible(array $field,array $answers): bool
