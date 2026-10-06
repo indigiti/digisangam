@@ -9,18 +9,18 @@ final class Authorization
         'super_admin' => ['*'],
         'workspace_admin' => [
             'events.*','registration.*','attendees.*','tickets.*','commerce.*','analytics.view','workspace.*',
-            'communications.*','automation.*','badges.*','agenda.*','exhibitors.*','venue.*','onground.*','intelligence.*'
+            'communications.*','automation.*','badges.*','agenda.*','exhibitors.*','venue.*','onground.*','intelligence.*','accreditation.*','reports.*','developer.*','media.*','wallet.*','credentials.*'
         ],
         'event_manager' => [
             'events.*','registration.*','attendees.*','tickets.*','analytics.view',
-            'communications.*','automation.*','badges.*','agenda.*','exhibitors.*','venue.*','onground.view','intelligence.*'
+            'communications.*','automation.*','badges.*','agenda.*','exhibitors.*','venue.*','onground.*','intelligence.*','accreditation.*','reports.*','media.*','wallet.*','credentials.*','developer.view'
         ],
-        'registration_manager' => ['registration.*','attendees.*','tickets.view','analytics.view','communications.view','badges.view','agenda.view','intelligence.view'],
-        'finance' => ['tickets.view','commerce.*','analytics.view','exhibitors.view','intelligence.view'],
-        'onsite' => ['attendees.view','attendees.checkin','tickets.view','onground.*','badges.view','venue.view','agenda.view','intelligence.view'],
+        'registration_manager' => ['registration.*','attendees.*','tickets.view','analytics.view','communications.view','badges.view','agenda.view','intelligence.view','accreditation.*','reports.view','media.*','wallet.*'],
+        'finance' => ['tickets.view','commerce.*','analytics.view','exhibitors.view','intelligence.view','reports.*'],
+        'onsite' => ['attendees.view','attendees.checkin','tickets.view','onground.*','badges.*','venue.view','agenda.view','intelligence.view','accreditation.view','credentials.*','wallet.view'],
         'viewer' => [
             'events.view','attendees.view','tickets.view','analytics.view','communications.view','automation.view',
-            'badges.view','agenda.view','exhibitors.view','venue.view','onground.view','intelligence.view'
+            'badges.view','agenda.view','exhibitors.view','venue.view','onground.view','intelligence.view','accreditation.view','reports.view','developer.view'
         ],
     ];
 
