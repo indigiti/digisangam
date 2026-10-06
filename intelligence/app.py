@@ -20,6 +20,10 @@ def require_internal_token(authorization: str | None = Header(default=None)) -> 
         raise HTTPException(status_code=401, detail="Invalid intelligence service token.")
 
 
+class EventBuilderRequest(BaseModel):
+    prompt: str = Field(min_length=1, max_length=5000)
+
+
 class GraphRequest(BaseModel):
     graph: dict[str, Any]
 
@@ -38,6 +42,11 @@ class ConciergeRequest(BaseModel):
 @app.get("/health")
 def health() -> dict[str, Any]:
     return {"ok": True, "service": "digisangam-intelligence", "version": "3.0.0"}
+
+
+@app.post("/v1/event-builder", dependencies=[Depends(require_internal_token)])
+def event_builder(request: EventBuilderRequest) -> dict[str, Any]:
+    return engine.event_blueprint(request.prompt)
 
 
 @app.post("/v1/analyze", dependencies=[Depends(require_internal_token)])
