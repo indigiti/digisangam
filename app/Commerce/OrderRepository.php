@@ -14,6 +14,12 @@ final class OrderRepository
         return $this->store->read('orders/index.json', []);
     }
 
+    public function find(string $id): ?array
+    {
+        foreach($this->all() as $row) if(($row['id']??'')===$id) return $row;
+        return null;
+    }
+
     public function findLatestByAttendee(string $attendeeId): ?array
     {
         foreach($this->all() as $row) if(($row['attendee_id']??'')===$attendeeId) return $row;
@@ -34,6 +40,7 @@ final class OrderRepository
             'status'=>(string)($input['status'] ?? 'pending'),
             'payment_reference'=>(string)($input['payment_reference'] ?? ''),
             'provider'=>(string)($input['provider'] ?? ''),
+            'provider_order_id'=>(string)($input['provider_order_id'] ?? ''),
             'created_at'=>date(DATE_ATOM),
         ];
         array_unshift($rows, $record);
@@ -49,6 +56,7 @@ final class OrderRepository
             $row['status']=(string)($payment['status'] ?? $row['status']);
             $row['payment_reference']=(string)($payment['payment_reference'] ?? $row['payment_reference']);
             $row['provider']=(string)($payment['provider'] ?? $row['provider']);
+            if(isset($payment['provider_order_id'])) $row['provider_order_id']=(string)$payment['provider_order_id'];
             $row['updated_at']=date(DATE_ATOM);
             $updated=$row;
             break;
