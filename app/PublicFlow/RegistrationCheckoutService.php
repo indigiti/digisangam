@@ -76,6 +76,7 @@ final class RegistrationCheckoutService
         $requiresPayment=(int)($reserved['price'] ?? 0) > 0;
         $status = ($approvalMode === 'manual' || $requiresPayment) ? 'Pending' : 'Confirmed';
         $confirmationToken = bin2hex(random_bytes(24));
+        $attendee = null;
 
         try {
             $attendee = $this->attendees->create([
@@ -83,32 +84,38 @@ final class RegistrationCheckoutService
                 'status'=>$status,'event_id'=>$eventId,'ticket_id'=>$ticketId,'answers'=>$answers,
                 'confirmation_token'=>$confirmationToken,
             ]);
+
+            $order = $this->orders->create([
+                'event_id'=>$eventId,'attendee_id'=>$attendee['id'],'ticket_id'=>$ticketId,
+                'amount'=>(int)($reserved['price'] ?? 0),'currency'=>'INR','status'=>$requiresPayment?'pending':'paid',
+            ]);
+            $payment = $this->payments->create($order, ['attendee'=>$attendee,'event'=>$public['event'],'ticket'=>$reserved]);
+            $order = $this->orders->updatePayment((string)$order['id'],$payment) ?? $order;
+
+            if (($payment['status'] ?? '') === 'paid' && $approvalMode !== 'manual') {
+                $attendee = $this->attendees->update((string)$attendee['id'],['status'=>'Confirmed']) ?? $attendee;
+            }
         } catch (\Throwable $e) {
+            if ($attendee !== null) $this->attendees->delete((string)$attendee['id']);
+            $this->tickets->releaseOne($ticketId,$eventId);
             throw $e;
-        }
-
-        $order = $this->orders->create([
-            'event_id'=>$eventId,'attendee_id'=>$attendee['id'],'ticket_id'=>$ticketId,
-            'amount'=>(int)($reserved['price'] ?? 0),'currency'=>'INR','status'=>$requiresPayment?'pending':'paid',
-        ]);
-        $payment = $this->payments->create($order, ['attendee'=>$attendee,'event'=>$public['event'],'ticket'=>$reserved]);
-        $order = $this->orders->updatePayment((string)$order['id'],$payment) ?? $order;
-
-        if (($payment['status'] ?? '') === 'paid' && $approvalMode !== 'manual') {
-            $attendee = $this->attendees->update((string)$attendee['id'],['status'=>'Confirmed']) ?? $attendee;
         }
 
         $credential = ($attendee['status'] ?? '') === 'Confirmed' && ($order['status'] ?? '') === 'paid'
             ? $this->credentials->issue((string)$attendee['id'], $eventId)
             : null;
 
-        $this->notifications->queue('email','registration_confirmation',['email'=>$email],[
-            'event_id'=>$eventId,'attendee_id'=>$attendee['id'],'status'=>$attendee['status'],'confirmation_token'=>$confirmationToken
-        ]);
-        if ($phone !== '') {
-            $this->notifications->queue('whatsapp','registration_confirmation',['phone'=>$phone],[
-                'event_id'=>$eventId,'attendee_id'=>$attendee['id'],'status'=>$attendee['status']
+        try {
+            $this->notifications->queue('email','registration_confirmation',['email'=>$email],[
+                'event_id'=>$eventId,'attendee_id'=>$attendee['id'],'status'=>$attendee['status'],'confirmation_token'=>$confirmationToken
             ]);
+            if ($phone !== '') {
+                $this->notifications->queue('whatsapp','registration_confirmation',['phone'=>$phone],[
+                    'event_id'=>$eventId,'attendee_id'=>$attendee['id'],'status'=>$attendee['status']
+                ]);
+            }
+        } catch (\Throwable) {
+            // Registration remains valid even if the notification outbox is temporarily unavailable.
         }
 
         return [
@@ -128,22 +135,42 @@ final class RegistrationCheckoutService
         if (!$attendee) throw new \RuntimeException('Confirmation not found.');
         $event = $this->events->find((string)$attendee['event_id']);
         $ticket = $this->tickets->find((string)($attendee['ticket_id'] ?? ''));
-        $credential = ($attendee['status'] ?? '') === 'Confirmed'
+        $order = $this->orders->findLatestByAttendee((string)$attendee['id']);
+        $credential = ($attendee['status'] ?? '') === 'Confirmed' && (($order['status'] ?? 'paid') === 'paid')
             ? $this->credentials->issue((string)$attendee['id'], (string)$attendee['event_id'])
             : null;
-        return ['attendee'=>$this->publicAttendee($attendee),'event'=>$event,'ticket'=>$ticket,'credential'=>$credential];
+        return [
+            'attendee'=>$this->publicAttendee($attendee),
+            'event'=>$event,
+            'ticket'=>$ticket,
+            'order'=>$order,
+            'credential'=>$credential,
+        ];
     }
 
     private function validateRequiredFields(array $fields, array $answers): void
     {
         foreach ($fields as $field) {
-            if (empty($field['required'])) continue;
+            if (!$this->isVisible($field,$answers) || empty($field['required'])) continue;
             $id=(string)($field['id'] ?? '');
             $value=$answers[$id] ?? null;
             if ($value === null || $value === '' || $value === []) {
                 throw new \InvalidArgumentException(((string)($field['label'] ?? 'Required field')) . ' is required.');
             }
         }
+    }
+
+    private function isVisible(array $field,array $answers): bool
+    {
+        if (($field['visibility'] ?? 'always') !== 'conditional' || !is_array($field['condition'] ?? null)) return true;
+        $condition=$field['condition'];
+        $source=$answers[(string)($condition['field'] ?? '')] ?? null;
+        $value=$condition['value'] ?? null;
+        return match ((string)($condition['operator'] ?? 'equals')) {
+            'not_equals' => $source !== $value,
+            'contains' => is_array($source) ? in_array($value,$source,true) : str_contains((string)$source,(string)$value),
+            default => $source === $value,
+        };
     }
 
     private function assertInvitation(string $email): void
