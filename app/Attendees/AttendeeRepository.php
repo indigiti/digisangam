@@ -20,6 +20,15 @@ final class AttendeeRepository
         return null;
     }
 
+    public function findByEmailForEvent(string $email,string $eventId): ?array
+    {
+        $email=strtolower(trim($email));
+        foreach($this->all() as $row){
+            if(($row['event_id']??'')===$eventId && strtolower((string)($row['email']??''))===$email) return $row;
+        }
+        return null;
+    }
+
     public function findByConfirmationToken(string $token): ?array
     {
         foreach ($this->all() as $row) {
