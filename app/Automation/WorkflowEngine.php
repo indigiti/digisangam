@@ -17,6 +17,9 @@ final class WorkflowEngine
         $runs=[];
         foreach($this->workflows->all() as $workflow){
             if(empty($workflow['enabled']) || ($workflow['trigger']??'')!==$eventName) continue;
+            $workflowEvent=(string)($workflow['event_id']??'');
+            $contextEvent=(string)($context['event_id']??'');
+            if($workflowEvent!=='' && $workflowEvent!==$contextEvent) continue;
             if(!$this->conditionsPass((array)($workflow['conditions']??[]),$context)) continue;
 
             $delayMinutes=0;$queued=[];
