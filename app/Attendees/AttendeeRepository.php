@@ -43,6 +43,7 @@ final class AttendeeRepository
         $name = trim((string)($input['name'] ?? ''));
         $email = strtolower(trim((string)($input['email'] ?? '')));
         $eventId = trim((string)($input['event_id'] ?? ''));
+        if ($eventId === '') throw new \InvalidArgumentException('Event is required.');
         if ($name === '' || !filter_var($email, FILTER_VALIDATE_EMAIL)) throw new \InvalidArgumentException('Name and a valid email are required.');
         foreach ($rows as $existing) {
             if (($existing['event_id'] ?? '') === $eventId && strtolower((string)($existing['email'] ?? '')) === $email) {
@@ -64,8 +65,6 @@ final class AttendeeRepository
             'confirmation_token'=>(string)($input['confirmation_token'] ?? bin2hex(random_bytes(24))),
             'created_at'=>date(DATE_ATOM),
         ];
-        if(($record['event_id']??'')==='') throw new \InvalidArgumentException('Event is required.');
-        if(($record['event_id']??'')==='') throw new \InvalidArgumentException('Event is required.');
         array_unshift($rows, $record);
         $this->store->write('attendees/index.json', $rows);
         return $record;
@@ -112,15 +111,4 @@ final class AttendeeRepository
         return strtoupper(substr((string)($parts[0] ?? ''),0,1).substr((string)($parts[count($parts)-1] ?? ''),0,1));
     }
 
-    private static function demo(): array
-    {
-        return [
-            ['id'=>'TKT20394823','name'=>'Rohit Sharma','initials'=>'RS','category'=>'VIP','company'=>'Google','status'=>'Confirmed','email'=>'rohit@example.test','event_id'=>'evt_001'],
-            ['id'=>'TKT20394824','name'=>'Priya Mehta','initials'=>'PM','category'=>'General','company'=>'Infosys','status'=>'Confirmed','email'=>'priya@example.test','event_id'=>'evt_001'],
-            ['id'=>'TKT20394825','name'=>'Amit Kumar','initials'=>'AK','category'=>'Sponsor','company'=>'Microsoft','status'=>'Pending','email'=>'amit@example.test','event_id'=>'evt_001'],
-            ['id'=>'TKT20394826','name'=>'Sneha Patel','initials'=>'SP','category'=>'Speaker','company'=>'TEDx','status'=>'Confirmed','email'=>'sneha@example.test','event_id'=>'evt_001'],
-            ['id'=>'TKT20394827','name'=>'Vikram Singh','initials'=>'VS','category'=>'Media','company'=>'NDTV','status'=>'Confirmed','email'=>'vikram@example.test','event_id'=>'evt_001'],
-            ['id'=>'TKT20394828','name'=>'Ananya Rao','initials'=>'AR','category'=>'General','company'=>'TCS','status'=>'Waitlist','email'=>'ananya@example.test','event_id'=>'evt_001'],
-        ];
-    }
 }
