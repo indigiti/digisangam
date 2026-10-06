@@ -209,7 +209,7 @@ try{
     if(empty($rfid['allowed'])||($rfid['credential_source']??'')!=='RFID') fail('RFID scanner route failed.',$rfid);
 
     $walkin=request('POST','/api/v1/onground/walk-in',[
-        'event_id'=>$eventId,'name'=>'HTTP Walk In','phone'=>'918000000001','category'=>'General','payment_settled'=>true,
+        'event_id'=>$eventId,'name'=>'HTTP Walk In','email'=>'http-walkin@example.test','phone'=>'918000000001','category'=>'General','payment_settled'=>true,
     ],$csrf)['data'];
     if(($walkin['attendee']['source']??'')!=='walk_in'||empty($walkin['credential']['payload'])) fail('Walk-in API failed.',$walkin);
 
