@@ -58,7 +58,7 @@ export const api={
   attendee:(id)=>request('/attendees/'+encodeURIComponent(id)),
   createAttendee:(payload)=>request('/attendees',{method:'POST',body:JSON.stringify(payload)}),
   updateAttendee:(id,payload)=>request('/attendees/'+encodeURIComponent(id),{method:'PATCH',body:JSON.stringify(payload)}),
-  importAttendees:(csv)=>request('/attendees/import',{method:'POST',body:JSON.stringify({csv})}),
+  importAttendees:(csv,eventId)=>request('/attendees/import'+(eventId?'?event_id='+encodeURIComponent(eventId):''),{method:'POST',body:JSON.stringify({csv,event_id:eventId})}),
   credential:(id)=>request('/attendees/'+encodeURIComponent(id)+'/credential'),
   scannerVerify:(payload,zone_id='')=>request('/scanner/verify',{method:'POST',body:JSON.stringify({payload,zone_id})}),
   scannerCheckin:(payload,zone_id='')=>request('/scanner/checkin',{method:'POST',body:JSON.stringify({payload,zone_id})}),
