@@ -79,11 +79,11 @@ async function hydrate(){
 async function createWalkin(){
   busy.value=true;error.value=''
   try{
-    const result=await api.walkIn({...walkin.value,event_id:eventId.value})
-    attendees.value.unshift(result.attendee)
+    const registration=await api.walkIn({...walkin.value,event_id:eventId.value})
+    attendees.value.unshift(registration.attendee)
     showWalkin.value=false
     walkin.value={name:'',email:'',phone:'',company:'',category:schema.value?.categories?.[0]||'General',ticket_id:'',payment_settled:true,payment_reference:''}
-    result.value=result
+    result.value={allowed:true,reason:'WALK_IN_REGISTERED',attendee:registration.attendee,credential:registration.credential}
   }catch(e){error.value=e.message}finally{busy.value=false}
 }
 async function createBinding(){
