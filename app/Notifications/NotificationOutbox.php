@@ -18,6 +18,7 @@ final class NotificationOutbox
             'recipient'=>$recipient,
             'data'=>$data,
             'status'=>'queued',
+            'attempts'=>0,
             'created_at'=>date(DATE_ATOM),
         ];
         $this->store->transaction('notifications/outbox.json', static function(array $rows) use ($record): array {
@@ -25,5 +26,30 @@ final class NotificationOutbox
             return ['data'=>$rows,'result'=>$record];
         }, []);
         return $record;
+    }
+
+    public function pending(int $limit=25): array
+    {
+        $rows=$this->store->read('notifications/outbox.json',[]);
+        $pending=array_values(array_filter($rows,static fn(array $row): bool => in_array($row['status']??'queued',['queued','retry'],true)));
+        return array_slice($pending,0,max(1,$limit));
+    }
+
+    public function mark(string $id,string $status,array $meta=[]): ?array
+    {
+        return $this->store->transaction('notifications/outbox.json',static function(array $rows) use ($id,$status,$meta): array {
+            $updated=null;
+            foreach($rows as &$row){
+                if(($row['id']??'')!==$id) continue;
+                $row['status']=$status;
+                $row['attempts']=(int)($row['attempts']??0)+1;
+                $row['updated_at']=date(DATE_ATOM);
+                foreach($meta as $key=>$value) $row[$key]=$value;
+                $updated=$row;
+                break;
+            }
+            unset($row);
+            return ['data'=>$rows,'result'=>$updated];
+        },[]);
     }
 }
