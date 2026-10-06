@@ -1,5 +1,7 @@
 import { defineStore } from 'pinia'
 
+const authBase=(import.meta.env.BASE_URL||'/').replace(/\/$/,'')+'/api/v1/auth'
+
 export const useAuthStore = defineStore('auth', {
   state: () => ({
     initialized: false,
@@ -10,7 +12,7 @@ export const useAuthStore = defineStore('auth', {
   }),
   actions: {
     async bootstrap() {
-      const response = await fetch('/api/v1/auth/status', { credentials: 'same-origin' })
+      const response = await fetch(authBase+'/status', { credentials: 'same-origin' })
       const data = await response.json()
       this.setupRequired = !!data.setup_required
       this.user = data.user || null
@@ -20,7 +22,7 @@ export const useAuthStore = defineStore('auth', {
     },
     async setup(payload) {
       this.error = ''
-      const response = await fetch('/api/v1/auth/setup', {
+      const response = await fetch(authBase+'/setup', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'same-origin',
@@ -38,7 +40,7 @@ export const useAuthStore = defineStore('auth', {
     },
     async login(payload) {
       this.error = ''
-      const response = await fetch('/api/v1/auth/login', {
+      const response = await fetch(authBase+'/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'same-origin',
@@ -55,7 +57,7 @@ export const useAuthStore = defineStore('auth', {
     },
     async logout() {
       if (this.user) {
-        await fetch('/api/v1/auth/logout', {
+        await fetch(authBase+'/logout', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': this.csrf || '' },
           credentials: 'same-origin',
