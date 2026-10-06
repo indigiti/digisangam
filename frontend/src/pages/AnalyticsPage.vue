@@ -1,7 +1,24 @@
 <script setup>
+import {computed,onMounted,ref,watch} from 'vue'
+import {api} from '../services/api'
+import {useEventStore} from '../stores/event'
 import StatCard from '../components/StatCard.vue'
-import {dashboard} from '../data/demo'
-const source=[{n:'Website',v:42},{n:'Invite Campaign',v:20},{n:'Social Media',v:15},{n:'Partners',v:10},{n:'Direct',v:5}]
-const bars=[28,36,44,41,50,58,54,63,68,74,69,82,78,90]
+import LineSpark from '../components/LineSpark.vue'
+
+const events=useEventStore(),data=ref(null),error=ref('')
+const metrics=computed(()=>data.value?.metrics||{})
+async function load(){
+  if(!events.loaded) await events.load()
+  if(!events.currentId){data.value=null;return}
+  try{data.value=await api.dashboard(events.currentId)}catch(e){error.value=e.message}
+}
+onMounted(load);watch(()=>events.currentId,load)
 </script>
-<template><div class="space-y-6"><section><p class="eyebrow">Intelligence</p><h1 class="page-title">Analytics & Reports</h1><p class="page-subtitle">A live operational view of registrations, attendance and revenue.</p></section><section class="grid gap-4 sm:grid-cols-2 xl:grid-cols-4"><StatCard v-for="s in dashboard.stats" :key="s.label" v-bind="s"/></section><section class="grid gap-5 xl:grid-cols-[1.5fr_.8fr]"><article class="panel p-5"><div class="flex justify-between"><div><p class="panel-kicker">Growth</p><h2 class="panel-title">Registrations over time</h2></div><select class="select-sm"><option>01 Oct–31 Oct</option></select></div><div class="mt-8 flex h-64 items-end gap-2 border-b border-slate-100 px-2"><div v-for="(b,i) in bars" :key="i" class="flex-1 rounded-t-md bg-indigo-500/80" :style="{height:b+'%'}"></div></div></article><article class="panel p-5"><p class="panel-kicker">Acquisition</p><h2 class="panel-title">Top registration sources</h2><div class="mt-7 space-y-5"><div v-for="s in source" :key="s.n"><div class="mb-2 flex justify-between text-xs font-semibold"><span>{{s.n}}</span><b>{{s.v}}%</b></div><div class="h-2 rounded-full bg-slate-100"><div class="h-full rounded-full bg-indigo-500" :style="{width:s.v*2+'%'}"></div></div></div></div></article></section><section class="grid gap-5 md:grid-cols-3"><article class="panel p-5"><p class="panel-kicker">Conversion</p><p class="mt-2 text-3xl font-bold">71.4%</p><p class="mt-2 text-sm text-emerald-600">↑ 8.2% vs previous period</p></article><article class="panel p-5"><p class="panel-kicker">No-show risk</p><p class="mt-2 text-3xl font-bold">8.6%</p><p class="mt-2 text-sm text-slate-500">Estimated from confirmations</p></article><article class="panel p-5"><p class="panel-kicker">Avg. ticket value</p><p class="mt-2 text-3xl font-bold">₹3,287</p><p class="mt-2 text-sm text-slate-500">Across paid ticket categories</p></article></section></div></template>
+<template><div class="space-y-6"><section><p class="eyebrow">Analytics</p><h1 class="page-title">Analytics & Reports</h1><p class="page-subtitle">Calculated from the selected event’s real registration, payment and check-in records.</p></section>
+<p v-if="error" class="rounded-xl bg-rose-50 p-4 text-sm font-semibold text-rose-700">{{error}}</p>
+<section v-if="!events.currentId" class="panel p-10 text-center"><p class="text-sm text-slate-500">Select or create an event to view analytics.</p></section>
+<template v-else-if="data">
+<section class="grid gap-4 sm:grid-cols-2 xl:grid-cols-4"><StatCard v-for="s in data.stats" :key="s.label" v-bind="s"/></section>
+<section class="grid gap-5 xl:grid-cols-[1.5fr_.8fr]"><article class="panel p-5"><p class="panel-kicker">Growth</p><h2 class="panel-title">Registrations · last 14 days</h2><LineSpark :values="data.trend"/></article><article class="panel p-5"><p class="panel-kicker">Conversion</p><h2 class="panel-title">Operational rates</h2><div class="mt-6 space-y-5"><div><div class="flex justify-between text-xs"><span>Confirmation rate</span><b>{{metrics.confirmation_rate||0}}%</b></div><div class="mt-2 h-2 rounded-full bg-slate-100"><div class="h-full rounded-full bg-emerald-500" :style="{width:(metrics.confirmation_rate||0)+'%'}"></div></div></div><div><div class="flex justify-between text-xs"><span>Check-in rate</span><b>{{metrics.checkin_rate||0}}%</b></div><div class="mt-2 h-2 rounded-full bg-slate-100"><div class="h-full rounded-full bg-cyan-500" :style="{width:(metrics.checkin_rate||0)+'%'}"></div></div></div></div></article></section>
+<section class="panel overflow-hidden"><div class="border-b p-5"><p class="panel-kicker">Audience</p><h2 class="panel-title">Category distribution</h2></div><div class="overflow-x-auto"><table class="data-table"><thead><tr><th>Category</th><th>Attendees</th><th>Share</th></tr></thead><tbody><tr v-if="!data.categories.length"><td colspan="3" class="text-center">No registrations yet.</td></tr><tr v-for="c in data.categories" :key="c.label"><td><b>{{c.label}}</b></td><td>{{c.count}}</td><td>{{c.value}}%</td></tr></tbody></table></div></section>
+</template></div></template>
