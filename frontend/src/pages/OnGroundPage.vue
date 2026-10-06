@@ -1,9 +1,11 @@
 <script setup>
-import { computed, onMounted, onUnmounted, ref } from 'vue'
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
+import { useEventStore } from '../stores/event'
 import { api } from '../services/api'
 import { offlineStore } from '../services/offline'
 
-const eventId='evt_001'
+const events=useEventStore()
+const eventId=computed(()=>events.currentId)
 const payload=ref(''),result=ref(null),busy=ref(false),mode=ref('verify'),error=ref(''),zoneId=ref('')
 const online=ref(navigator.onLine),snapshot=ref(null),queue=ref([])
 const allowed=computed(()=>!!result.value?.allowed)
@@ -14,7 +16,7 @@ async function refreshQueue(){queue.value=await offlineStore.queued()}
 async function downloadSnapshot(){
   busy.value=true;error.value=''
   try{
-    const data=await api.ongroundSnapshot(eventId)
+    const data=await api.ongroundSnapshot(eventId.value)
     await offlineStore.saveSnapshot(data)
     snapshot.value=data
   }catch(e){error.value=e.message}
@@ -33,13 +35,13 @@ async function syncQueue(){
   finally{busy.value=false}
 }
 async function offlineCheckin(value){
-  const credential=await offlineStore.findCredential(eventId,value)
+  const credential=await offlineStore.findCredential(eventId.value,value)
   if(!credential) return {allowed:false,reason:'NOT_IN_OFFLINE_SNAPSHOT'}
   const duplicate=queue.value.find(x=>x.attendee_id===credential.attendee_id)
   if(duplicate) return {allowed:true,reason:'ALREADY_QUEUED_OFFLINE',attendee:credential,already_checked_in:true}
   const zone=zones.value.find(x=>x.id===zoneId.value)
   if(zone&&zone.categories?.length&&!zone.categories.includes(credential.category)) return {allowed:false,reason:'ZONE_DENIED',attendee:credential,zone}
-  const item={local_id:'off_'+Date.now()+'_'+Math.random().toString(16).slice(2),event_id:eventId,attendee_id:credential.attendee_id,payload:value,zone_id:zoneId.value,scanned_at:new Date().toISOString()}
+  const item={local_id:'off_'+Date.now()+'_'+Math.random().toString(16).slice(2),event_id:eventId.value,attendee_id:credential.attendee_id,payload:value,zone_id:zoneId.value,scanned_at:new Date().toISOString()}
   await offlineStore.queueCheckin(item)
   await refreshQueue()
   return {allowed:true,reason:'QUEUED_OFFLINE',attendee:credential,offline:true}
@@ -59,14 +61,15 @@ async function run(action=mode.value){
   finally{busy.value=false}
 }
 function reset(){payload.value='';result.value=null;error.value=''}
-async function hydrate(){snapshot.value=await offlineStore.snapshot(eventId);await refreshQueue()}
+async function hydrate(){snapshot.value=eventId.value?await offlineStore.snapshot(eventId.value):null;await refreshQueue()}
 function setOnline(){online.value=navigator.onLine;if(online.value)syncQueue()}
-onMounted(()=>{hydrate();window.addEventListener('online',setOnline);window.addEventListener('offline',setOnline)})
+onMounted(async()=>{if(!events.loaded)await events.load();await hydrate();window.addEventListener('online',setOnline);window.addEventListener('offline',setOnline)})
+watch(eventId,()=>{result.value=null;payload.value='';hydrate()})
 onUnmounted(()=>{window.removeEventListener('online',setOnline);window.removeEventListener('offline',setOnline)})
 </script>
 
 <template><div class="space-y-6">
-<section class="flex flex-col justify-between gap-4 sm:flex-row sm:items-end"><div><p class="eyebrow">OnGround</p><h1 class="page-title">Offline-First Check-in</h1><p class="page-subtitle">Online verification when connected; signed event snapshot and queued reconciliation when offline.</p></div><div class="flex flex-wrap items-center gap-2"><span class="status-badge" :class="online?'badge-published':'badge-draft'">{{online?'Online':'Offline'}}</span><button class="btn-secondary" :disabled="busy||!online" @click="downloadSnapshot">Sync event data</button><button class="btn-primary" :disabled="busy||!online||!syncCount" @click="syncQueue">Sync {{syncCount}} check-ins</button></div></section>
+<section class="flex flex-col justify-between gap-4 sm:flex-row sm:items-end"><div><p class="eyebrow">OnGround</p><h1 class="page-title">Offline-First Check-in</h1><p class="page-subtitle">{{events.current?.name||'Select an event'}} · live and offline credential validation.</p></div><div class="flex flex-wrap items-center gap-2"><span class="status-badge" :class="online?'badge-published':'badge-draft'">{{online?'Online':'Offline'}}</span><button class="btn-secondary" :disabled="busy||!online||!eventId" @click="downloadSnapshot">Sync event data</button><button class="btn-primary" :disabled="busy||!online||!syncCount" @click="syncQueue">Sync {{syncCount}} check-ins</button></div></section>
 
 <section class="grid gap-4 sm:grid-cols-3"><article class="panel p-5"><p class="panel-kicker">Offline snapshot</p><p class="mt-2 text-lg font-black">{{snapshot?'Ready':'Not synced'}}</p><p class="mt-1 text-xs text-slate-400">{{snapshot?.generated_at||'Download before doors open'}}</p></article><article class="panel p-5"><p class="panel-kicker">Cached attendees</p><p class="mt-2 text-2xl font-black">{{snapshot?.credentials?.length||0}}</p></article><article class="panel p-5"><p class="panel-kicker">Pending sync</p><p class="mt-2 text-2xl font-black">{{syncCount}}</p></article></section>
 
