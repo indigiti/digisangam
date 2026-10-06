@@ -61,6 +61,25 @@ $publicFlow = static function () use ($store,$credentialSecret): RegistrationChe
     );
 };
 
+$paymentCapture = static function () use ($store,$journal): PaymentCaptureService {
+    return new PaymentCaptureService(
+        new OrderRepository($store),
+        new AttendeeRepository($store),
+        new RegistrationRepository($store),
+        new NotificationOutbox($store),
+        $journal,
+    );
+};
+
+$scanner = static function () use ($store,$credentialSecret): ScannerService {
+    return new ScannerService(
+        new CredentialService($credentialSecret()),
+        new AttendeeRepository($store),
+        new OrderRepository($store),
+        new CheckinRepository($store),
+    );
+};
+
 try {
     if ($method === 'GET' && $path === '/auth/status') {
         JsonResponse::send([
@@ -94,6 +113,20 @@ try {
         JsonResponse::send(['ok'=>true]);
     }
 
+    if ($method === 'POST' && $path === '/webhooks/payments/razorpay') {
+        $raw=(string)file_get_contents('php://input');
+        $signature=(string)($_SERVER['HTTP_X_RAZORPAY_SIGNATURE'] ?? '');
+        $payload=(new RazorpayWebhookVerifier((string)getenv('RAZORPAY_WEBHOOK_SECRET')))->verify($raw,$signature);
+        $result=(new PaymentWebhookService(
+            new OrderRepository($store),
+            new AttendeeRepository($store),
+            new RegistrationRepository($store),
+            new NotificationOutbox($store),
+            $journal,
+        ))->handleRazorpay($payload);
+        JsonResponse::send($result);
+    }
+
     // Public attendee-facing API. These routes intentionally do not require an admin session.
     if (str_starts_with($path, '/public/')) {
         if ($auth->setupRequired()) {
@@ -116,8 +149,49 @@ try {
             JsonResponse::send($result,201);
         }
 
+        if ($method === 'POST' && $path === '/public/payments/razorpay/verify') {
+            (new PublicRequestGuard($store))->enforce('payment-verify', 30, 600);
+            $input=$body();
+            $token=(string)($input['confirmation_token'] ?? '');
+            $attendee=(new AttendeeRepository($store))->findByConfirmationToken($token);
+            if(!$attendee) JsonResponse::send(['error'=>'Invalid confirmation token.'],422);
+
+            $orderId=(string)($input['order_id'] ?? '');
+            $order=(new OrderRepository($store))->find($orderId);
+            if(!$order || ($order['attendee_id'] ?? '') !== ($attendee['id'] ?? '')) JsonResponse::send(['error'=>'Order does not match this registration.'],422);
+
+            $providerOrderId=(string)($input['razorpay_order_id'] ?? '');
+            if(($order['provider_order_id'] ?? '') !== $providerOrderId) JsonResponse::send(['error'=>'Razorpay order mismatch.'],422);
+
+            $verified=(new RazorpayCheckoutVerifier((string)getenv('RAZORPAY_KEY_SECRET')))->verify(
+                $providerOrderId,
+                (string)($input['razorpay_payment_id'] ?? ''),
+                (string)($input['razorpay_signature'] ?? '')
+            );
+            if(!$verified) JsonResponse::send(['error'=>'Payment signature verification failed.'],422);
+
+            $paymentCapture()->capture($orderId,'razorpay',(string)$input['razorpay_payment_id']);
+            $result=$publicFlow()->confirmation($token);
+            $result['receipt']=(new ReceiptService())->build(
+                (array)($result['event'] ?? []),
+                (array)($result['attendee'] ?? []),
+                (array)($result['ticket'] ?? []),
+                (array)($result['order'] ?? []),
+                (new WorkspaceRepository($store))->current(),
+            );
+            JsonResponse::send($result);
+        }
+
         if ($method === 'GET' && preg_match('#^/public/confirmations/([a-f0-9]{32,})$#',$path,$m)) {
-            JsonResponse::send($publicFlow()->confirmation($m[1]));
+            $result=$publicFlow()->confirmation($m[1]);
+            $result['receipt']=(new ReceiptService())->build(
+                (array)($result['event'] ?? []),
+                (array)($result['attendee'] ?? []),
+                (array)($result['ticket'] ?? []),
+                (array)($result['order'] ?? []),
+                (new WorkspaceRepository($store))->current(),
+            );
+            JsonResponse::send($result);
         }
 
         JsonResponse::send(['error'=>'Public endpoint not found.'],404);
@@ -129,6 +203,27 @@ try {
 
     $auth->requireUser();
     if (!in_array($method, ['GET','HEAD'], true)) $auth->validateCsrf();
+
+    if ($method === 'POST' && $path === '/scanner/verify') {
+        $auth->requirePermission('attendees.checkin');
+        $input=$body();
+        JsonResponse::send($scanner()->verify((string)($input['payload'] ?? '')));
+    }
+
+    if ($method === 'POST' && $path === '/scanner/checkin') {
+        $user=$auth->requirePermission('attendees.checkin');
+        $input=$body();
+        $result=$scanner()->checkin((string)($input['payload'] ?? ''),(string)$user['id']);
+        if(!empty($result['allowed'])){
+            $journal->append('attendee.checked_in',[
+                'attendee_id'=>$result['attendee']['id'] ?? null,
+                'event_id'=>$result['event_id'] ?? null,
+                'operator_id'=>$user['id'],
+                'already_checked_in'=>$result['already_checked_in'] ?? false,
+            ]);
+        }
+        JsonResponse::send($result,!empty($result['allowed'])?200:422);
+    }
 
     if ($method === 'GET' && $path === '/workspace') {
         $auth->requirePermission('workspace.view');
