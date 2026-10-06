@@ -12,6 +12,7 @@ use DigiSangam\Events\EventRepository;
 use DigiSangam\Exhibitors\ExhibitorRepository;
 use DigiSangam\Exhibitors\LeadRepository;
 use DigiSangam\Exhibitors\MeetingRepository;
+use DigiSangam\OnGround\AccessEventRepository;
 use DigiSangam\OnGround\CheckinRepository;
 use DigiSangam\Tickets\TicketRepository;
 use DigiSangam\Venue\SeatAssignmentRepository;
@@ -31,6 +32,7 @@ final class EventGraphBuilder
         $leadRepo=new LeadRepository($this->store);
         $meetingRepo=new MeetingRepository($this->store);
         $checkinRepo=new CheckinRepository($this->store);
+        $accessRepo=new AccessEventRepository($this->store);
         $venueRepo=new VenueRepository($this->store);
         $seatRepo=new SeatAssignmentRepository($this->store);
 
@@ -43,6 +45,7 @@ final class EventGraphBuilder
         $leads=$this->filter($leadRepo->all(),$eventId);
         $meetings=$this->filter($meetingRepo->all(),$eventId);
         $checkins=$checkinRepo->all($eventId);
+        $accessEvents=$accessRepo->all($eventId);
         $venue=$venueRepo->get($eventId);
         $zones=(array)($venue['zones']??[]);
         $seats=$seatRepo->all($eventId);
@@ -84,11 +87,7 @@ final class EventGraphBuilder
         $eventCapacity=array_sum(array_map(static fn(array $x): int => (int)($x['quantity']??0),$tickets));
         if($eventCapacity<=0) $eventCapacity=array_sum(array_map(static fn(array $x): int => (int)($x['capacity']??0),$zones));
 
-        $zoneOccupancy=[];
-        foreach($checkins as $row){
-            $zone=(string)($row['zone_id']??'');
-            if($zone!=='') $zoneOccupancy[$zone]=($zoneOccupancy[$zone]??0)+1;
-        }
+        $zoneOccupancy=$accessRepo->currentOccupancy($eventId);
 
         return [
             'event_id'=>$eventId,
@@ -122,6 +121,7 @@ final class EventGraphBuilder
                 'session_attendance'=>array_map('count',$sessionAttendance),
                 'leads'=>count($leads),
                 'meetings'=>count($meetings),
+                'access_events'=>count($accessEvents),
             ],
         ];
     }
