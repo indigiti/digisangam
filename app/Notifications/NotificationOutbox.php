@@ -29,6 +29,23 @@ final class NotificationOutbox
         return $record;
     }
 
+    public function all(): array
+    {
+        return $this->store->read('notifications/outbox.json',[]);
+    }
+
+    public function campaignSummary(string $campaignId): array
+    {
+        $rows=array_values(array_filter($this->all(),static fn(array $row): bool => (string)($row['data']['campaign_id']??'')===$campaignId));
+        $summary=['total'=>count($rows),'queued'=>0,'retry'=>0,'sent'=>0,'simulated'=>0,'failed'=>0];
+        foreach($rows as $row){
+            $status=(string)($row['status']??'queued');
+            if(array_key_exists($status,$summary)) $summary[$status]++;
+        }
+        $summary['pending']=$summary['queued']+$summary['retry'];
+        return $summary;
+    }
+
     public function pending(int $limit=25): array
     {
         $now=time();
