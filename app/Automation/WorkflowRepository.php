@@ -18,7 +18,7 @@ final class WorkflowRepository
     {
         $record=[
             'id'=>'flow_'.bin2hex(random_bytes(6)),
-            'event_id'=>(string)($input['event_id']??'evt_001'),
+            'event_id'=>trim((string)($input['event_id'] ?? '')),
             'name'=>trim((string)($input['name']??'New Workflow')),
             'trigger'=>(string)($input['trigger']??'person.registered'),
             'conditions'=>(array)($input['conditions']??[]),
@@ -27,6 +27,7 @@ final class WorkflowRepository
             'runs'=>0,'last_run_at'=>null,
             'created_at'=>date(DATE_ATOM),
         ];
+        if(($record['event_id']??'')==='') throw new \InvalidArgumentException('Event is required.');
         $rows=$this->all(); array_unshift($rows,$record);
         $this->store->write('automation/workflows.json',$rows);
         return $record;
