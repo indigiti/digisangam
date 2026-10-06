@@ -30,6 +30,8 @@ use DigiSangam\Core\Storage\JsonFileStore;
 use DigiSangam\Credentials\CredentialService;
 use DigiSangam\Events\EventRepository;
 use DigiSangam\Invitations\InvitationRepository;
+use DigiSangam\Intelligence\EventGraphBuilder;
+use DigiSangam\Intelligence\IntelligenceClient;
 use DigiSangam\Notifications\NotificationOutbox;
 use DigiSangam\Payments\PaymentService;
 use DigiSangam\PublicFlow\PublicRequestGuard;
@@ -101,6 +103,13 @@ $automation = static function () use ($store): WorkflowEngine {
     return new WorkflowEngine(
         new WorkflowRepository($store),
         new NotificationOutbox($store),
+    );
+};
+
+$intelligence = static function (): IntelligenceClient {
+    return new IntelligenceClient(
+        (string)getenv('DIGISANGAM_INTELLIGENCE_URL'),
+        (string)getenv('DIGISANGAM_INTELLIGENCE_TOKEN'),
     );
 };
 
@@ -237,6 +246,17 @@ try {
             JsonResponse::send($result);
         }
 
+        if ($method === 'POST' && preg_match('#^/public/concierge/([a-f0-9]{32,})$#',$path,$m)) {
+            (new PublicRequestGuard($store))->enforce('concierge', 40, 600);
+            $attendee=(new AttendeeRepository($store))->findByConfirmationToken($m[1]);
+            if(!$attendee) JsonResponse::send(['error'=>'Registration not found.'],404);
+            $input=$body();
+            $question=trim((string)($input['question']??''));
+            if($question==='') JsonResponse::send(['error'=>'Question is required.'],422);
+            $graph=(new EventGraphBuilder($store))->build((string)$attendee['event_id']);
+            JsonResponse::send($intelligence()->concierge($question,(string)$attendee['id'],$graph));
+        }
+
         JsonResponse::send(['error'=>'Public endpoint not found.'],404);
     }
 
@@ -286,6 +306,44 @@ try {
     if ($method === 'GET' && $path === '/dashboard') {
         $auth->requirePermission('analytics.view');
         JsonResponse::send((new AnalyticsService())->dashboard());
+    }
+
+    // Phase 3 — EventOS Intelligence
+    if ($method === 'GET' && $path === '/intelligence/overview') {
+        $auth->requirePermission('intelligence.view');
+        $eventId=(string)($_GET['event_id'] ?? 'evt_001');
+        $graph=(new EventGraphBuilder($store))->build($eventId);
+        JsonResponse::send([
+            'event_id'=>$eventId,
+            'metrics'=>$graph['metrics'],
+            'analysis'=>$intelligence()->analyze($graph),
+            'graph'=>[
+                'nodes'=>array_map('count',(array)$graph['nodes']),
+                'edges'=>count((array)$graph['edges']),
+                'generated_at'=>$graph['generated_at'],
+            ],
+        ]);
+    }
+
+    if ($method === 'GET' && $path === '/intelligence/graph') {
+        $auth->requirePermission('intelligence.view');
+        $eventId=(string)($_GET['event_id'] ?? 'evt_001');
+        JsonResponse::send((new EventGraphBuilder($store))->build($eventId));
+    }
+
+    if ($method === 'POST' && $path === '/intelligence/copilot') {
+        $auth->requirePermission('intelligence.use');
+        $input=$body();
+        $eventId=(string)($input['event_id'] ?? 'evt_001');
+        $question=trim((string)($input['question'] ?? ''));
+        if($question==='') JsonResponse::send(['error'=>'Question is required.'],422);
+        $graph=(new EventGraphBuilder($store))->build($eventId);
+        $result=$intelligence()->copilot($question,$graph);
+        $journal->append('intelligence.copilot_asked',[
+            'event_id'=>$eventId,
+            'question_hash'=>hash('sha256',$question),
+        ]);
+        JsonResponse::send($result);
     }
 
     $events = new EventRepository($store);
