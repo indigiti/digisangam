@@ -13,8 +13,13 @@ import TicketsPage from '../pages/TicketsPage.vue'
 import CommercePage from '../pages/CommercePage.vue'
 import AnalyticsPage from '../pages/AnalyticsPage.vue'
 import OnGroundPage from '../pages/OnGroundPage.vue'
+import CommunicationPage from '../pages/CommunicationPage.vue'
+import AutomationPage from '../pages/AutomationPage.vue'
+import BadgesPage from '../pages/BadgesPage.vue'
+import AgendaPage from '../pages/AgendaPage.vue'
+import ExhibitorsPage from '../pages/ExhibitorsPage.vue'
+import VenuePage from '../pages/VenuePage.vue'
 import SettingsPage from '../pages/SettingsPage.vue'
-import PlaceholderPage from '../pages/PlaceholderPage.vue'
 
 export default createRouter({
   history:createWebHistory(),
@@ -30,10 +35,15 @@ export default createRouter({
       {path:'registrations',name:'registrations',component:RegistrationBuilderPage},
       {path:'attendees',name:'attendees',component:AttendeesPage},
       {path:'tickets',name:'tickets',component:TicketsPage},
+      {path:'communication',name:'communication',component:CommunicationPage},
+      {path:'automation',name:'automation',component:AutomationPage},
+      {path:'badges',name:'badges',component:BadgesPage},
+      {path:'agenda',name:'agenda',component:AgendaPage},
+      {path:'exhibitors',name:'exhibitors',component:ExhibitorsPage},
+      {path:'venue',name:'venue',component:VenuePage},
+      {path:'onground',name:'onground',component:OnGroundPage},
       {path:'commerce',name:'commerce',component:CommercePage},
       {path:'analytics',name:'analytics',component:AnalyticsPage},
-      {path:'onground',name:'onground',component:OnGroundPage},
-      {path:'communication',name:'communication',component:PlaceholderPage,props:{title:'Communication',description:'Campaigns and communication dashboards continue in Phase 2; delivery adapters and the notification worker are already operational.'}},
       {path:'settings',name:'settings',component:SettingsPage},
     ]}
   ]
