@@ -74,6 +74,12 @@ $body = static function (): array {
     return is_array($decoded) ? $decoded : [];
 };
 
+$eventQuery=trim((string)($_GET['event_id'] ?? ''));
+$forEvent=static function(array $rows,string $eventId): array {
+    if($eventId==='') return $rows;
+    return array_values(array_filter($rows,static fn(array $row): bool => ($row['event_id']??'')===$eventId));
+};
+
 $credentialSecret = static function () use ($store): string {
     $env = trim((string)getenv('DIGISANGAM_CREDENTIAL_SECRET'));
     if ($env !== '') return $env;
@@ -325,7 +331,7 @@ try {
 
     if ($method === 'GET' && $path === '/dashboard') {
         $auth->requirePermission('analytics.view');
-        JsonResponse::send((new AnalyticsService())->dashboard());
+        JsonResponse::send((new AnalyticsService($store))->dashboard($eventQuery));
     }
 
     // Phase 3 — EventOS Intelligence
@@ -368,7 +374,7 @@ try {
 
     if ($method === 'GET' && $path === '/intelligence/actions') {
         $auth->requirePermission('intelligence.view');
-        JsonResponse::send((new ActionProposalRepository($store))->all());
+        JsonResponse::send($forEvent((new ActionProposalRepository($store))->all(),$eventQuery));
     }
 
     if ($method === 'POST' && $path === '/intelligence/actions') {
@@ -404,6 +410,51 @@ try {
         $input = $body();
         if (trim((string)($input['name'] ?? '')) === '') JsonResponse::send(['error'=>'Event name is required.'], 422);
         $event = $events->create($input);
+
+        $registrationInput=(array)($input['registration']??[]);
+        (new RegistrationRepository($store))->save($event['id'],[
+            'title'=>(string)($registrationInput['title']??($event['name'].' Registration')),
+            'approval_mode'=>(string)($registrationInput['approval_mode']??'auto'),
+            'categories'=>(array)($registrationInput['categories']??['General']),
+            'fields'=>(array)($registrationInput['fields']??[
+                ['id'=>'fld_name','label'=>'Full Name','type'=>'text','required'=>true,'visibility'=>'always'],
+                ['id'=>'fld_email','label'=>'Email Address','type'=>'email','required'=>true,'visibility'=>'always'],
+                ['id'=>'fld_phone','label'=>'Mobile Number','type'=>'phone','required'=>true,'visibility'=>'always'],
+                ['id'=>'fld_category','label'=>'Category','type'=>'select','required'=>true,'visibility'=>'always'],
+                ['id'=>'fld_company','label'=>'Company Name','type'=>'text','required'=>false,'visibility'=>'always'],
+            ]),
+        ]);
+
+        (new VenueRepository($store))->save($event['id'],[
+            'name'=>(string)($input['venue_name']??''),
+            'address'=>(string)($input['location']??''),
+            'zones'=>[],
+            'seating'=>[],
+        ]);
+
+        $ticketInput=(array)($input['ticket']??[]);
+        if(!empty($ticketInput['enabled'])){
+            (new TicketRepository($store))->create([
+                'event_id'=>$event['id'],
+                'name'=>(string)($ticketInput['name']??'General Admission'),
+                'price'=>(int)($ticketInput['price']??0),
+                'quantity'=>(int)($ticketInput['quantity']??100),
+                'status'=>'Active',
+                'sale_start'=>(string)($ticketInput['sale_start']??''),
+                'sale_end'=>(string)($ticketInput['sale_end']??''),
+            ]);
+        }
+
+        (new BadgeTemplateRepository($store))->create([
+            'event_id'=>$event['id'],
+            'name'=>'Standard Badge',
+            'category'=>'All',
+            'background'=>'#ffffff',
+            'accent'=>(string)($event['branding']['primary_color']??'#4f46e5'),
+            'show_qr'=>true,
+            'fields'=>['name','company','category'],
+        ]);
+
         $journal->append('event.created', ['event_id'=>$event['id'],'name'=>$event['name']]);
         JsonResponse::send($event, 201);
     }
@@ -441,11 +492,12 @@ try {
     $invitations = new InvitationRepository($store);
     if ($method === 'GET' && $path === '/invitations') {
         $auth->requirePermission('registration.view');
-        JsonResponse::send($invitations->all());
+        JsonResponse::send($forEvent($invitations->all(),$eventQuery));
     }
     if ($method === 'POST' && $path === '/invitations') {
         $auth->requirePermission('registration.manage');
         $input=$body();
+        if(trim((string)($input['event_id']??''))==='') JsonResponse::send(['error'=>'Event is required.'],422);
         if (!filter_var((string)($input['email'] ?? ''), FILTER_VALIDATE_EMAIL)) JsonResponse::send(['error'=>'Valid email required.'],422);
         $invite=$invitations->create($input);
         $journal->append('invitation.created',['invitation_id'=>$invite['id']]);
@@ -455,7 +507,7 @@ try {
     $attendees = new AttendeeRepository($store);
     if ($method === 'GET' && $path === '/attendees') {
         $auth->requirePermission('attendees.view');
-        JsonResponse::send($attendees->all());
+        JsonResponse::send($forEvent($attendees->all(),$eventQuery));
     }
     if ($method === 'POST' && $path === '/attendees') {
         $auth->requirePermission('attendees.manage');
@@ -467,13 +519,17 @@ try {
         $auth->requirePermission('attendees.view');
         header('Content-Type: text/csv; charset=utf-8');
         header('Content-Disposition: attachment; filename="digisangam-attendees.csv"');
-        echo CsvService::encode($attendees->all());
+        echo CsvService::encode($forEvent($attendees->all(),$eventQuery));
         exit;
     }
     if ($method === 'POST' && $path === '/attendees/import') {
         $auth->requirePermission('attendees.manage');
         $input=$body();
-        $result=$attendees->import(CsvService::decode((string)($input['csv'] ?? '')));
+        $decoded=CsvService::decode((string)($input['csv'] ?? ''));
+        $importEvent=trim((string)($input['event_id']??$eventQuery));
+        if($importEvent==='') JsonResponse::send(['error'=>'Event is required for import.'],422);
+        $decoded=array_map(static fn(array $row): array => $row+['event_id'=>$importEvent],$decoded);
+        $result=$attendees->import($decoded);
         $journal->append('attendees.imported',['created'=>$result['created'],'skipped'=>$result['skipped']]);
         JsonResponse::send($result);
     }
@@ -511,7 +567,7 @@ try {
     $tickets = new TicketRepository($store);
     if ($method === 'GET' && $path === '/tickets') {
         $auth->requirePermission('tickets.view');
-        JsonResponse::send($tickets->all());
+        JsonResponse::send($forEvent($tickets->all(),$eventQuery));
     }
     if ($method === 'POST' && $path === '/tickets') {
         $auth->requirePermission('tickets.manage');
@@ -530,7 +586,7 @@ try {
     $orders = new OrderRepository($store);
     if ($method === 'GET' && $path === '/orders') {
         $auth->requirePermission('commerce.view');
-        JsonResponse::send($orders->all());
+        JsonResponse::send($forEvent($orders->all(),$eventQuery));
     }
     if ($method === 'POST' && $path === '/orders') {
         $auth->requirePermission('commerce.manage');
@@ -543,7 +599,7 @@ try {
     $campaigns=new CampaignRepository($store);
     if($method==='GET' && $path==='/campaigns'){
         $auth->requirePermission('communications.view');
-        JsonResponse::send($campaigns->all());
+        JsonResponse::send($forEvent($campaigns->all(),$eventQuery));
     }
     if($method==='POST' && $path==='/campaigns'){
         $auth->requirePermission('communications.manage');
@@ -568,7 +624,7 @@ try {
     $workflows=new WorkflowRepository($store);
     if($method==='GET' && $path==='/automations'){
         $auth->requirePermission('automation.view');
-        JsonResponse::send($workflows->all());
+        JsonResponse::send($forEvent($workflows->all(),$eventQuery));
     }
     if($method==='POST' && $path==='/automations'){
         $auth->requirePermission('automation.manage');
@@ -595,7 +651,7 @@ try {
     $badges=new BadgeTemplateRepository($store);
     if($method==='GET' && $path==='/badges'){
         $auth->requirePermission('badges.view');
-        JsonResponse::send($badges->all());
+        JsonResponse::send($forEvent($badges->all(),$eventQuery));
     }
     if($method==='POST' && $path==='/badges'){
         $auth->requirePermission('badges.manage');
@@ -611,7 +667,7 @@ try {
     $sessions=new SessionRepository($store);
     if($method==='GET' && $path==='/sessions'){
         $auth->requirePermission('agenda.view');
-        JsonResponse::send($sessions->all());
+        JsonResponse::send($forEvent($sessions->all(),$eventQuery));
     }
     if($method==='POST' && $path==='/sessions'){
         $auth->requirePermission('agenda.manage');
@@ -654,7 +710,7 @@ try {
     $exhibitors=new ExhibitorRepository($store);
     if($method==='GET' && $path==='/exhibitors'){
         $auth->requirePermission('exhibitors.view');
-        JsonResponse::send($exhibitors->all());
+        JsonResponse::send($forEvent($exhibitors->all(),$eventQuery));
     }
     if($method==='POST' && $path==='/exhibitors'){
         $auth->requirePermission('exhibitors.manage');
@@ -669,7 +725,7 @@ try {
     // Phase 2 — Exhibitor leads and meetings
     if($method==='GET' && $path==='/leads'){
         $auth->requirePermission('exhibitors.view');
-        JsonResponse::send((new LeadRepository($store))->all());
+        JsonResponse::send($forEvent((new LeadRepository($store))->all(),$eventQuery));
     }
     if($method==='POST' && $path==='/leads'){
         $auth->requirePermission('exhibitors.manage');
@@ -679,7 +735,7 @@ try {
     }
     if($method==='GET' && $path==='/meetings'){
         $auth->requirePermission('exhibitors.view');
-        JsonResponse::send((new MeetingRepository($store))->all());
+        JsonResponse::send($forEvent((new MeetingRepository($store))->all(),$eventQuery));
     }
     if($method==='POST' && $path==='/meetings'){
         $auth->requirePermission('exhibitors.manage');
@@ -696,7 +752,7 @@ try {
     // Phase 2 — Badge print queue
     if($method==='GET' && $path==='/badge-prints'){
         $auth->requirePermission('badges.view');
-        JsonResponse::send((new PrintJobRepository($store))->all());
+        JsonResponse::send($forEvent((new PrintJobRepository($store))->all(),$eventQuery));
     }
     if($method==='POST' && $path==='/badge-prints'){
         $auth->requirePermission('badges.manage');
