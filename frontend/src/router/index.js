@@ -12,6 +12,7 @@ import AttendeesPage from '../pages/AttendeesPage.vue'
 import TicketsPage from '../pages/TicketsPage.vue'
 import CommercePage from '../pages/CommercePage.vue'
 import AnalyticsPage from '../pages/AnalyticsPage.vue'
+import IntelligencePage from '../pages/IntelligencePage.vue'
 import OnGroundPage from '../pages/OnGroundPage.vue'
 import CommunicationPage from '../pages/CommunicationPage.vue'
 import AutomationPage from '../pages/AutomationPage.vue'
@@ -44,6 +45,7 @@ export default createRouter({
       {path:'onground',name:'onground',component:OnGroundPage},
       {path:'commerce',name:'commerce',component:CommercePage},
       {path:'analytics',name:'analytics',component:AnalyticsPage},
+      {path:'intelligence',name:'intelligence',component:IntelligencePage},
       {path:'settings',name:'settings',component:SettingsPage},
     ]}
   ]
