@@ -89,6 +89,13 @@ $scanner = static function () use ($store,$credentialSecret): ScannerService {
     );
 };
 
+$automation = static function () use ($store): WorkflowEngine {
+    return new WorkflowEngine(
+        new WorkflowRepository($store),
+        new NotificationOutbox($store),
+    );
+};
+
 try {
     if ($method === 'GET' && $path === '/auth/status') {
         JsonResponse::send([
@@ -133,6 +140,13 @@ try {
             new NotificationOutbox($store),
             $journal,
         ))->handleRazorpay($payload);
+        if(empty($result['duplicate']) && ($result['order']['status'] ?? '')==='paid' && !empty($result['attendee'])){
+            $context=(array)$result['attendee'];
+            $context['event_id']=$result['order']['event_id'] ?? ($context['event_id'] ?? '');
+            $context['order_id']=$result['order']['id'] ?? '';
+            $automation()->fire('payment.captured',$context);
+            if(($context['status'] ?? '')==='Confirmed') $automation()->fire('attendee.confirmed',$context);
+        }
         JsonResponse::send($result);
     }
 
@@ -155,6 +169,11 @@ try {
                 'ticket_id'=>$result['ticket']['id'] ?? null,
                 'order_id'=>$result['order']['id'] ?? null,
             ]);
+            $privateAttendee=(new AttendeeRepository($store))->find((string)($result['attendee']['id'] ?? ''));
+            if($privateAttendee){
+                $automation()->fire('person.registered',$privateAttendee);
+                if(($privateAttendee['status'] ?? '')==='Confirmed') $automation()->fire('attendee.confirmed',$privateAttendee);
+            }
             JsonResponse::send($result,201);
         }
 
@@ -179,7 +198,14 @@ try {
             );
             if(!$verified) JsonResponse::send(['error'=>'Payment signature verification failed.'],422);
 
-            $paymentCapture()->capture($orderId,'razorpay',(string)$input['razorpay_payment_id']);
+            $capture=$paymentCapture()->capture($orderId,'razorpay',(string)$input['razorpay_payment_id']);
+            if(empty($capture['duplicate']) && !empty($capture['attendee'])){
+                $context=(array)$capture['attendee'];
+                $context['event_id']=$order['event_id'] ?? ($context['event_id'] ?? '');
+                $context['order_id']=$orderId;
+                $automation()->fire('payment.captured',$context);
+                if(($context['status'] ?? '')==='Confirmed') $automation()->fire('attendee.confirmed',$context);
+            }
             $result=$publicFlow()->confirmation($token);
             $result['receipt']=(new ReceiptService())->build(
                 (array)($result['event'] ?? []),
@@ -230,6 +256,10 @@ try {
                 'operator_id'=>$user['id'],
                 'already_checked_in'=>$result['already_checked_in'] ?? false,
             ]);
+            if(empty($result['already_checked_in'])){
+                $privateAttendee=(new AttendeeRepository($store))->find((string)($result['attendee']['id'] ?? ''));
+                if($privateAttendee) $automation()->fire('attendee.checked_in',$privateAttendee);
+            }
         }
         JsonResponse::send($result,!empty($result['allowed'])?200:422);
     }
@@ -348,9 +378,11 @@ try {
         }
         if(in_array($method,['PUT','PATCH'],true)) {
             $auth->requirePermission('attendees.manage');
+            $before=$attendees->find($id);
             $record=$attendees->update($id,$body());
             if(!$record) JsonResponse::send(['error'=>'Attendee not found.'],404);
             $journal->append('attendee.updated',['attendee_id'=>$id,'status'=>$record['status'] ?? null]);
+            if(($before['status'] ?? '')!=='Confirmed' && ($record['status'] ?? '')==='Confirmed') $automation()->fire('attendee.confirmed',$record);
             JsonResponse::send($record);
         }
     }
