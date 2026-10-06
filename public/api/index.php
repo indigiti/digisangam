@@ -3,6 +3,9 @@ declare(strict_types=1);
 
 use DigiSangam\Analytics\AnalyticsService;
 use DigiSangam\Agenda\SessionRepository;
+use DigiSangam\Agenda\SessionAccessService;
+use DigiSangam\Agenda\SessionAttendanceRepository;
+use DigiSangam\Venue\SeatAssignmentRepository;
 use DigiSangam\Automation\WorkflowEngine;
 use DigiSangam\Automation\WorkflowRepository;
 use DigiSangam\Badges\BadgeTemplateRepository;
@@ -514,6 +517,33 @@ try {
         JsonResponse::send($record??['error'=>'Session not found.'],$record?200:404);
     }
 
+    // Phase 2 — Session attendance
+    if($method==='GET' && preg_match('#^/sessions/([^/]+)/attendance$#',$path,$m)){
+        $auth->requirePermission('agenda.view');
+        JsonResponse::send((new SessionAttendanceRepository($store))->all($m[1]));
+    }
+    if($method==='POST' && preg_match('#^/sessions/([^/]+)/enter$#',$path,$m)){
+        $user=$auth->requirePermission('attendees.checkin');
+        $input=$body();
+        $result=(new SessionAccessService(
+            new CredentialService($credentialSecret()),
+            new AttendeeRepository($store),
+            new OrderRepository($store),
+            new SessionRepository($store),
+            new SessionAttendanceRepository($store),
+        ))->enter($m[1],(string)($input['payload']??''),(string)$user['id']);
+        if(!empty($result['allowed']) && empty($result['duplicate'])){
+            $journal->append('session.entered',[
+                'session_id'=>$m[1],
+                'attendee_id'=>$result['attendee']['id']??null,
+                'operator_id'=>$user['id'],
+            ]);
+            $privateAttendee=(new AttendeeRepository($store))->find((string)($result['attendee']['id']??''));
+            if($privateAttendee) $automation()->fire('session.entered',$privateAttendee+['session_id'=>$m[1]]);
+        }
+        JsonResponse::send($result,!empty($result['allowed'])?200:422);
+    }
+
     // Phase 2 — Exhibitors and sponsors
     $exhibitors=new ExhibitorRepository($store);
     if($method==='GET' && $path==='/exhibitors'){
@@ -584,6 +614,17 @@ try {
         $record=(new VenueRepository($store))->save($m[1],$body());
         $journal->append('venue.updated',['event_id'=>$m[1]]);
         JsonResponse::send($record);
+    }
+
+    if($method==='GET' && preg_match('#^/venue/([^/]+)/seats$#',$path,$m)){
+        $auth->requirePermission('venue.view');
+        JsonResponse::send((new SeatAssignmentRepository($store))->all($m[1]));
+    }
+    if($method==='POST' && preg_match('#^/venue/([^/]+)/seats$#',$path,$m)){
+        $auth->requirePermission('venue.manage');
+        $record=(new SeatAssignmentRepository($store))->assign($m[1],$body());
+        $journal->append('seat.assigned',['event_id'=>$m[1],'attendee_id'=>$record['attendee_id'],'seat'=>$record['seat']]);
+        JsonResponse::send($record,201);
     }
 
     // Phase 2 — signed offline package for OnGround clients
