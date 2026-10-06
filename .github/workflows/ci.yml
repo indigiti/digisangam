@@ -30,6 +30,18 @@ jobs:
         run: find app public scripts tests -name '*.php' -print0 | xargs -0 -n1 php -l
       - name: PHP smoke tests
         run: php tests/smoke.php
+      - name: HTTP API E2E
+        run: |
+          export DIGISANGAM_STORAGE_ROOT="$RUNNER_TEMP/digisangam-e2e-storage"
+          rm -rf "$DIGISANGAM_STORAGE_ROOT"
+          php -S 127.0.0.1:8099 tests/router.php > "$RUNNER_TEMP/digisangam-e2e-server.log" 2>&1 &
+          SERVER_PID=$!
+          trap 'kill $SERVER_PID 2>/dev/null || true' EXIT
+          for i in {1..30}; do
+            if curl -fsS http://127.0.0.1:8099/api/v1/auth/status >/dev/null; then break; fi
+            sleep 0.2
+          done
+          php tests/api_e2e.php || { cat "$RUNNER_TEMP/digisangam-e2e-server.log"; exit 1; }
 
   python:
     runs-on: ubuntu-latest
