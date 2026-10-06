@@ -65,7 +65,7 @@ final class RegistrationCheckoutService
         if ($this->attendees->findByEmailForEvent($email,$eventId)) throw new \InvalidArgumentException('This email is already registered for the event.');
 
         $approvalMode = (string)($schema['approval_mode'] ?? 'auto');
-        if ($approvalMode === 'invite_only') $this->assertInvitation($email);
+        if ($approvalMode === 'invite_only') $this->assertInvitation($email,$eventId);
 
         $ticketId = trim((string)($input['ticket_id'] ?? ''));
         if ($ticketId === '') throw new \InvalidArgumentException('Please select a ticket.');
@@ -87,7 +87,7 @@ final class RegistrationCheckoutService
 
             $order = $this->orders->create([
                 'event_id'=>$eventId,'attendee_id'=>$attendee['id'],'ticket_id'=>$ticketId,
-                'amount'=>(int)($reserved['price'] ?? 0),'currency'=>'INR','status'=>$requiresPayment?'pending':'paid',
+                'amount'=>(int)($reserved['price'] ?? 0),'currency'=>strtoupper((string)($public['event']['currency']??'INR')),'status'=>$requiresPayment?'pending':'paid',
             ]);
             $payment = $this->payments->create($order, ['attendee'=>$attendee,'event'=>$public['event'],'ticket'=>$reserved]);
             $order = $this->orders->updatePayment((string)$order['id'],$payment) ?? $order;
@@ -173,10 +173,10 @@ final class RegistrationCheckoutService
         };
     }
 
-    private function assertInvitation(string $email): void
+    private function assertInvitation(string $email,string $eventId): void
     {
         foreach ($this->invitations->all() as $invite) {
-            if (strtolower((string)($invite['email'] ?? '')) === $email && ($invite['status'] ?? 'pending') !== 'revoked') return;
+            if (($invite['event_id']??'')===$eventId && strtolower((string)($invite['email'] ?? '')) === $email && ($invite['status'] ?? 'pending') !== 'revoked') return;
         }
         throw new \InvalidArgumentException('This event requires a valid invitation.');
     }
