@@ -20,13 +20,14 @@ final class PrintJobRepository
             'id'=>'print_'.bin2hex(random_bytes(6)),
             'event_id'=>trim((string)($input['event_id'] ?? '')),
             'attendee_id'=>(string)($input['attendee_id']??''),
-            'template_id'=>(string)($input['template_id']??'bdg_default'),
+            'template_id'=>trim((string)($input['template_id']??'')),
             'printer'=>(string)($input['printer']??'default'),
             'copies'=>max(1,min(10,(int)($input['copies']??1))),
             'status'=>'queued',
             'created_at'=>date(DATE_ATOM),
         ];
         if($record['attendee_id']==='') throw new \InvalidArgumentException('Attendee is required.');
+        if($record['template_id']==='') throw new \InvalidArgumentException('Badge template is required.');
         if(($record['event_id']??'')==='') throw new \InvalidArgumentException('Event is required.');
         $rows=$this->all();array_unshift($rows,$record);
         $this->store->write('badges/print-queue.json',$rows);
