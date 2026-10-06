@@ -4,6 +4,7 @@ declare(strict_types=1);
 namespace DigiSangam\Agenda;
 
 use DigiSangam\Attendees\AttendeeRepository;
+use DigiSangam\Commerce\OrderRepository;
 use DigiSangam\Credentials\CredentialService;
 
 final class SessionAccessService
@@ -11,6 +12,7 @@ final class SessionAccessService
     public function __construct(
         private readonly CredentialService $credentials,
         private readonly AttendeeRepository $attendees,
+        private readonly OrderRepository $orders,
         private readonly SessionRepository $sessions,
         private readonly SessionAttendanceRepository $attendance,
     ) {}
@@ -28,7 +30,13 @@ final class SessionAccessService
 
         $attendee=$this->attendees->find((string)($credential['attendee_id']??''));
         if(!$attendee) return ['allowed'=>false,'reason'=>'ATTENDEE_NOT_FOUND'];
+        if(($attendee['event_id']??'')!==($session['event_id']??'')) return ['allowed'=>false,'reason'=>'EVENT_MISMATCH'];
         if(($attendee['status']??'')!=='Confirmed') return ['allowed'=>false,'reason'=>'NOT_CONFIRMED'];
+
+        $order=$this->orders->findLatestByAttendee((string)$attendee['id']);
+        if($order && (int)($order['amount']??0)>0 && ($order['status']??'')!=='paid'){
+            return ['allowed'=>false,'reason'=>'PAYMENT_NOT_PAID'];
+        }
 
         $current=$this->attendance->all($sessionId);
         $already=false;
