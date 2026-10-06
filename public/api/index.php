@@ -499,7 +499,7 @@ try {
 
     if ($method === 'POST' && $path === '/intelligence/event-builder') {
         $auth->requirePermission('events.manage');$input=$body();
-        JsonResponse::send((new EventBlueprintService())->build((string)($input['prompt']??'')));
+        JsonResponse::send($intelligence()->eventBuilder((string)($input['prompt']??'')));
     }
 
     if ($method === 'POST' && $path === '/media') {
