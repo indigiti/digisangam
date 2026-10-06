@@ -4,10 +4,14 @@ import { useRoute } from 'vue-router'
 import { api } from '../services/api'
 import QrCredential from '../components/QrCredential.vue'
 import PublicConcierge from '../components/PublicConcierge.vue'
-const route=useRoute(),data=ref(null),loading=ref(true),error=ref('')
+const route=useRoute(),data=ref(null),loading=ref(true),error=ref(''),wallet=ref(null),walletBusy=ref(false)
 const money=(n,currency='INR')=>new Intl.NumberFormat('en-IN',{style:'currency',currency,maximumFractionDigits:0}).format(Number(n||0))
 onMounted(async()=>{try{data.value=await api.publicConfirmation(route.params.token)}catch(e){error.value=e.message}finally{loading.value=false}})
 function printDocument(){window.print()}
+async function issueWallet(platform){
+  walletBusy.value=true;error.value=''
+  try{wallet.value=await api.issueWallet(route.params.token,platform)}catch(e){error.value=e.message}finally{walletBusy.value=false}
+}
 </script>
 <template>
 <main class="min-h-screen bg-[#f5f7fb] p-5 text-slate-950 sm:p-8">
@@ -26,6 +30,13 @@ function printDocument(){window.print()}
           </div>
           <div v-if="data.credential"><p class="mb-3 text-center text-xs font-black uppercase tracking-widest text-slate-400">Entry QR</p><QrCredential :value="data.credential.payload"/><p class="mt-3 text-center text-xs leading-5 text-slate-400">Present this QR at event check-in.</p></div>
         </div>
+      </section>
+
+      <section v-if="data.credential" class="no-print mt-5 rounded-[24px] border border-slate-200 bg-white p-6 shadow-sm">
+        <p class="text-xs font-black uppercase tracking-widest text-slate-400">Mobile wallet</p>
+        <h2 class="mt-2 text-xl font-black">Keep your event credential handy</h2>
+        <div class="mt-4 flex flex-wrap gap-2"><button class="rounded-xl bg-slate-950 px-4 py-2.5 text-sm font-bold text-white" :disabled="walletBusy" @click="issueWallet('apple')">Apple Wallet</button><button class="rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-bold" :disabled="walletBusy" @click="issueWallet('google')">Google Wallet</button></div>
+        <div v-if="wallet" class="mt-4 rounded-xl bg-slate-50 p-4 text-sm"><b>{{wallet.platform}} · {{wallet.status}}</b><p v-if="wallet.provider_url" class="mt-2 break-all text-indigo-600"><a :href="wallet.provider_url">Open wallet provider</a></p><p v-else class="mt-2 text-slate-500">Provider signing/issuer credentials still need to be configured on the server.</p></div>
       </section>
 
       <PublicConcierge :token="route.params.token" />
