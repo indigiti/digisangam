@@ -215,6 +215,12 @@ try{
 
     $report=request('GET','/api/v1/reports?event_id='.rawurlencode($eventId))['data'];
     if(($report['registrations']??0)<2||($report['approved_accreditations']??0)!==1) fail('Operational reports API failed.',$report);
+    $reportDefinition=request('POST','/api/v1/report-definitions',[
+        'event_id'=>$eventId,'name'=>'Confirmed HTTP attendees','dataset'=>'attendees',
+        'columns'=>['name','email','status'],'filters'=>['status'=>'Confirmed'],
+    ],$csrf)['data'];
+    $reportDefinitions=request('GET','/api/v1/report-definitions?event_id='.rawurlencode($eventId))['data'];
+    if(count($reportDefinitions)!==1||($reportDefinitions[0]['id']??'')!==($reportDefinition['id']??'')) fail('Custom report builder API failed.',$reportDefinitions);
 
     $wallet=request('POST','/api/v1/public/confirmations/'.rawurlencode((string)$registrationResult['confirmation_token']).'/wallet',[
         'platform'=>'google',
