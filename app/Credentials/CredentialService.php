@@ -9,20 +9,21 @@ final class CredentialService
 
     public function issue(string $attendeeId, string $eventId): array
     {
-        $issuedAt = time();
-        $nonce = bin2hex(random_bytes(8));
+        // v2 is intentionally stable for an attendee/event pair so the same signed
+        // credential can be matched by an authenticated offline OnGround snapshot.
+        $nonce = substr(hash_hmac('sha256',$eventId.'|'.$attendeeId,$this->secret),0,16);
         $payload = base64_encode(json_encode([
-            'v'=>1,'attendee_id'=>$attendeeId,'event_id'=>$eventId,'iat'=>$issuedAt,'nonce'=>$nonce
+            'v'=>2,'attendee_id'=>$attendeeId,'event_id'=>$eventId,'nonce'=>$nonce
         ], JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR));
         $signature = hash_hmac('sha256', $payload, $this->secret);
         $token = rtrim(strtr($payload, '+/', '-_'), '=') . '.' . $signature;
         return [
             'type'=>'signed_event_credential',
+            'version'=>2,
             'token'=>$token,
             'payload'=>'digisangam://credential/' . $token,
             'attendee_id'=>$attendeeId,
             'event_id'=>$eventId,
-            'issued_at'=>date(DATE_ATOM, $issuedAt),
         ];
     }
 
@@ -38,6 +39,9 @@ final class CredentialService
         $expected = hash_hmac('sha256', $canonical, $this->secret);
         if (!hash_equals($expected, $signature)) return null;
         $data = json_decode($payload, true);
-        return is_array($data) ? $data : null;
+        if(!is_array($data)) return null;
+        if(!in_array((int)($data['v']??1),[1,2],true)) return null;
+        if(empty($data['attendee_id'])||empty($data['event_id'])) return null;
+        return $data;
     }
 }
