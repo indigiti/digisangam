@@ -27,8 +27,9 @@ final class WorkflowRepository
             'runs'=>0,'last_run_at'=>null,
             'created_at'=>date(DATE_ATOM),
         ];
-        if(($record['event_id']??'')==='') throw new \InvalidArgumentException('Event is required.');
-        if(($record['event_id']??'')==='') throw new \InvalidArgumentException('Event is required.');
+        if($record['event_id']==='') throw new \InvalidArgumentException('Event is required.');
+        if($record['name']==='') throw new \InvalidArgumentException('Workflow name is required.');
+        if($record['trigger']==='') throw new \InvalidArgumentException('Workflow trigger is required.');
         $rows=$this->all(); array_unshift($rows,$record);
         $this->store->write('automation/workflows.json',$rows);
         return $record;
@@ -48,21 +49,4 @@ final class WorkflowRepository
         return $updated;
     }
 
-    private static function defaults(): array
-    {
-        return [
-            [
-                'id'=>'flow_welcome','event_id'=>'evt_001','name'=>'Welcome confirmed attendees',
-                'trigger'=>'attendee.confirmed','conditions'=>[],
-                'actions'=>[['type'=>'email','template'=>'registration_confirmation'],['type'=>'wait','minutes'=>5],['type'=>'whatsapp','template'=>'registration_confirmation']],
-                'enabled'=>true,'runs'=>0,'last_run_at'=>null,
-            ],
-            [
-                'id'=>'flow_checkin','event_id'=>'evt_001','name'=>'Post check-in follow-up',
-                'trigger'=>'attendee.checked_in','conditions'=>[],
-                'actions'=>[['type'=>'wait','minutes'=>15],['type'=>'email','template'=>'post_checkin']],
-                'enabled'=>false,'runs'=>0,'last_run_at'=>null,
-            ],
-        ];
-    }
 }
