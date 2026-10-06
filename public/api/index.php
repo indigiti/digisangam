@@ -44,10 +44,26 @@ use DigiSangam\Registration\RegistrationRepository;
 use DigiSangam\Tickets\TicketRepository;
 use DigiSangam\Workspace\WorkspaceRepository;
 
-require dirname(__DIR__, 2) . '/app/bootstrap.php';
+$privateRoot=trim((string)getenv('DIGISANGAM_PRIVATE_ROOT'));
+$bootstrapCandidates=array_values(array_filter([
+    $privateRoot!=='' ? rtrim($privateRoot,'/').'/app/bootstrap.php' : '',
+    dirname(__DIR__,2).'/app/bootstrap.php',
+    dirname(__DIR__,3).'/private_html/digisangam/app/bootstrap.php',
+]));
+$bootstrapFile='';
+foreach($bootstrapCandidates as $candidate){
+    if(is_file($candidate)){ $bootstrapFile=$candidate; break; }
+}
+if($bootstrapFile===''){
+    http_response_code(503);
+    header('Content-Type: application/json; charset=utf-8');
+    echo json_encode(['error'=>'DIGISANGAM_PRIVATE_RUNTIME_NOT_FOUND']);
+    exit;
+}
+require $bootstrapFile;
 
-$root = dirname(__DIR__, 2);
-$store = new JsonFileStore($root . '/storage');
+$root = defined('DIGISANGAM_ROOT') ? DIGISANGAM_ROOT : dirname(__DIR__,2);
+$store = new JsonFileStore(defined('DIGISANGAM_STORAGE_ROOT') ? DIGISANGAM_STORAGE_ROOT : $root . '/storage');
 $journal = new EventJournal($store);
 $auth = new AuthService($store);
 $path = '/' . trim((string)($_GET['path'] ?? ''), '/');
