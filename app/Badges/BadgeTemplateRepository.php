@@ -30,6 +30,7 @@ final class BadgeTemplateRepository
             'created_at'=>date(DATE_ATOM),
         ];
         if(($record['event_id']??'')==='') throw new \InvalidArgumentException('Event is required.');
+        if(($record['event_id']??'')==='') throw new \InvalidArgumentException('Event is required.');
         $rows=$this->all(); array_unshift($rows,$record);
         $this->store->write('badges/templates.json',$rows);
         return $record;
