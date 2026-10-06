@@ -14,6 +14,17 @@ final class TicketRepository
         return $this->store->read('tickets/index.json', self::demo());
     }
 
+    public function publicForEvent(string $eventId): array
+    {
+        $today = date('Y-m-d');
+        return array_values(array_filter($this->all(), static function(array $row) use ($eventId,$today): bool {
+            if (($row['event_id'] ?? '') !== $eventId || ($row['status'] ?? '') !== 'Active') return false;
+            if (!empty($row['sale_start']) && $row['sale_start'] > $today) return false;
+            if (!empty($row['sale_end']) && $row['sale_end'] < $today) return false;
+            return (int)($row['sold'] ?? 0) < (int)($row['quantity'] ?? 0);
+        }));
+    }
+
     public function find(string $id): ?array
     {
         foreach ($this->all() as $row) if (($row['id'] ?? '') === $id) return $row;
@@ -53,6 +64,27 @@ final class TicketRepository
         unset($row);
         if($updated!==null) $this->store->write('tickets/index.json',$rows);
         return $updated;
+    }
+
+    public function reserveOne(string $ticketId, string $eventId): array
+    {
+        $fallback = self::demo();
+        return $this->store->transaction('tickets/index.json', function(array $rows) use ($ticketId,$eventId): array {
+            $reserved = null;
+            foreach ($rows as &$row) {
+                if (($row['id'] ?? '') !== $ticketId || ($row['event_id'] ?? '') !== $eventId) continue;
+                if (($row['status'] ?? '') !== 'Active') throw new \RuntimeException('This ticket is not available.');
+                $sold=(int)($row['sold'] ?? 0); $quantity=(int)($row['quantity'] ?? 0);
+                if ($sold >= $quantity) throw new \RuntimeException('This ticket is sold out.');
+                $row['sold']=$sold+1;
+                $row['updated_at']=date(DATE_ATOM);
+                $reserved=$row;
+                break;
+            }
+            unset($row);
+            if ($reserved === null) throw new \RuntimeException('Ticket not found for this event.');
+            return ['data'=>$rows,'result'=>$reserved];
+        }, $fallback);
     }
 
     private static function demo(): array
