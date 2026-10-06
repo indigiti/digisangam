@@ -9,7 +9,7 @@ final class NotificationOutbox
 {
     public function __construct(private readonly JsonFileStore $store) {}
 
-    public function queue(string $channel, string $template, array $recipient, array $data): array
+    public function queue(string $channel, string $template, array $recipient, array $data, string $notBefore = ''): array
     {
         $record = [
             'id'=>'msg_'.bin2hex(random_bytes(6)),
@@ -19,6 +19,7 @@ final class NotificationOutbox
             'data'=>$data,
             'status'=>'queued',
             'attempts'=>0,
+            'not_before'=>$notBefore,
             'created_at'=>date(DATE_ATOM),
         ];
         $this->store->transaction('notifications/outbox.json', static function(array $rows) use ($record): array {
@@ -35,6 +36,8 @@ final class NotificationOutbox
         $pending=array_values(array_filter($rows,static function(array $row) use ($now): bool {
             if(!in_array($row['status']??'queued',['queued','retry'],true)) return false;
             $next=(string)($row['next_attempt_at']??'');
+            $notBefore=(string)($row['not_before']??'');
+            if($notBefore!=='' && (strtotime($notBefore)?:0)>$now) return false;
             return $next==='' || (strtotime($next)?:0) <= $now;
         }));
         return array_slice($pending,0,max(1,$limit));
