@@ -1,8 +1,10 @@
 <script setup>
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
+import { useEventStore } from '../stores/event'
 import { api } from '../services/api'
 
-const eventId=ref('evt_001'),data=ref(null),loading=ref(true),error=ref(''),actions=ref([])
+const events=useEventStore(),data=ref(null),loading=ref(true),error=ref(''),actions=ref([])
+const eventId=computed(()=>events.currentId)
 const question=ref('What needs my attention right now?'),asking=ref(false),messages=ref([])
 const analysis=computed(()=>data.value?.analysis||{})
 const metrics=computed(()=>data.value?.metrics||{})
@@ -11,7 +13,7 @@ const money=n=>new Intl.NumberFormat('en-IN',{style:'currency',currency:'INR',ma
 
 async function load(){
   loading.value=true;error.value=''
-  try{[data.value,actions.value]=await Promise.all([api.intelligenceOverview(eventId.value),api.intelligenceActions()])}
+  try{if(!events.loaded)await events.load();if(!eventId.value){data.value=null;actions.value=[];return};[data.value,actions.value]=await Promise.all([api.intelligenceOverview(eventId.value),api.intelligenceActions(eventId.value)])}
   catch(e){error.value=e.message}
   finally{loading.value=false}
 }
@@ -37,13 +39,13 @@ async function decide(row,decision){
     Object.assign(row,updated)
   }catch(e){error.value=e.message}
 }
-onMounted(load)
+onMounted(load);watch(eventId,load)
 </script>
 
 <template><div class="space-y-6">
 <section class="flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
   <div><p class="eyebrow">Phase 3 · Intelligence</p><h1 class="page-title">Event Intelligence Center</h1><p class="page-subtitle">Forecasting, anomaly detection, crowd intelligence, lead scoring, recommendations and Organizer Copilot.</p></div>
-  <div class="flex gap-2"><input v-model="eventId" class="control w-40" placeholder="Event ID"/><button class="btn-secondary" @click="load">Refresh</button></div>
+  <div class="flex items-center gap-2"><span class="soft-pill">{{events.current?.name||'No event selected'}}</span><button class="btn-secondary" :disabled="!eventId" @click="load">Refresh</button></div>
 </section>
 
 <div v-if="loading" class="grid grid-cols-2 gap-4 lg:grid-cols-4"><div v-for="i in 8" :key="i" class="panel h-28 animate-pulse"></div></div>
