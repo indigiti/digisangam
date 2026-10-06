@@ -52,8 +52,15 @@ async function remove(store,key){
   })
 }
 
+function validateSnapshot(snapshot){
+  if(!snapshot||typeof snapshot!=='object') throw new Error('Invalid offline snapshot.')
+  if(!snapshot.event_id||!snapshot.signature||!Array.isArray(snapshot.credentials)) throw new Error('Offline snapshot is incomplete.')
+  if(Number(snapshot.version||0)<2) throw new Error('Offline snapshot version is unsupported.')
+  return snapshot
+}
+
 export const offlineStore={
-  saveSnapshot:snapshot=>put(STORE_SNAPSHOTS,snapshot),
+  saveSnapshot:snapshot=>put(STORE_SNAPSHOTS,{...validateSnapshot(snapshot),saved_at:new Date().toISOString()}),
   snapshot:eventId=>get(STORE_SNAPSHOTS,eventId),
   queued:()=>all(STORE_QUEUE),
   queueCheckin:item=>put(STORE_QUEUE,item),
@@ -61,6 +68,7 @@ export const offlineStore={
   async findCredential(eventId,payload){
     const snapshot=await get(STORE_SNAPSHOTS,eventId)
     if(!snapshot) return null
-    return snapshot.credentials?.find(x=>x.payload===payload)||null
+    try{validateSnapshot(snapshot)}catch{return null}
+    return snapshot.credentials.find(x=>x.payload===payload)||null
   },
 }
