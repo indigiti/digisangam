@@ -58,7 +58,7 @@ final class ScannerService
         $verification=$this->verify($payload,$zoneId);
         if(empty($verification['allowed'])) return $verification;
         $attendee=$verification['attendee'];
-        $result=$this->checkins->checkin((string)$verification['event_id'],(string)$attendee['id'],$operatorId);
+        $result=$this->checkins->checkin((string)$verification['event_id'],(string)$attendee['id'],$operatorId,$zoneId);
         return $verification + $result;
     }
 
