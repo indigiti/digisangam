@@ -24,6 +24,11 @@ final class Authorization
         ],
     ];
 
+    public static function roles(): array
+    {
+        return array_keys(self::ROLE_PERMISSIONS);
+    }
+
     public static function allows(string $role, string $permission): bool
     {
         foreach (self::ROLE_PERMISSIONS[$role] ?? [] as $granted) {
