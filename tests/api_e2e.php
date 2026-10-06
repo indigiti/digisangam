@@ -11,13 +11,14 @@ function fail(string $message,mixed $context=null): never {
     exit(1);
 }
 
-function request(string $method,string $path,?array $payload=null,string $csrf=''): array {
+function request(string $method,string $path,?array $payload=null,string $csrf='',array $extraHeaders=[]): array {
     global $base,$cookie;
     if(!function_exists('curl_init')) fail('PHP cURL extension is required for HTTP E2E.');
     $ch=curl_init($base.$path);
     $headers=['Accept: application/json'];
     if($payload!==null) $headers[]='Content-Type: application/json';
     if($csrf!=='') $headers[]='X-CSRF-Token: '.$csrf;
+    foreach($extraHeaders as $header) $headers[]=$header;
     curl_setopt_array($ch,[
         CURLOPT_RETURNTRANSFER=>true,
         CURLOPT_CUSTOMREQUEST=>$method,
@@ -188,6 +189,53 @@ try{
     $event2Id=(string)$event2['id'];
     $tickets2=request('GET','/api/v1/tickets?event_id='.rawurlencode($event2Id))['data'];
     if(count($tickets2)!==1||($tickets2[0]['event_id']??'')!==$event2Id) fail('Cross-event ticket isolation failed.',$tickets2);
+
+    // Remaining roadmap HTTP routes.
+    $blueprint=request('POST','/api/v1/intelligence/event-builder',[
+        'prompt'=>'Create a hybrid expo for VIP sponsors exhibitors with approval',
+    ],$csrf)['data'];
+    if(($blueprint['type']??'')!=='Expo'||($blueprint['format']??'')!=='hybrid') fail('AI Event Builder route failed.',$blueprint);
+
+    $accreditation=request('POST','/api/v1/accreditation',[
+        'event_id'=>$eventId,'attendee_id'=>$attendeeId,'type'=>'Media','quota_pool'=>'Media 25',
+    ],$csrf)['data'];
+    $accreditation=request('PATCH','/api/v1/accreditation/'.rawurlencode((string)$accreditation['id']),['status'=>'approved'],$csrf)['data'];
+    if(($accreditation['status']??'')!=='approved') fail('Accreditation lifecycle route failed.',$accreditation);
+
+    $binding=request('POST','/api/v1/credential-bindings',[
+        'event_id'=>$eventId,'attendee_id'=>$attendeeId,'type'=>'rfid','uid'=>'E2E123',
+    ],$csrf)['data'];
+    $rfid=request('POST','/api/v1/scanner/verify',['payload'=>'rfid:E2E123'],$csrf)['data'];
+    if(empty($rfid['allowed'])||($rfid['credential_source']??'')!=='RFID') fail('RFID scanner route failed.',$rfid);
+
+    $walkin=request('POST','/api/v1/onground/walk-in',[
+        'event_id'=>$eventId,'name'=>'HTTP Walk In','phone'=>'918000000001','category'=>'General','payment_settled'=>true,
+    ],$csrf)['data'];
+    if(($walkin['attendee']['source']??'')!=='walk_in'||empty($walkin['credential']['payload'])) fail('Walk-in API failed.',$walkin);
+
+    $report=request('GET','/api/v1/reports?event_id='.rawurlencode($eventId))['data'];
+    if(($report['registrations']??0)<2||($report['approved_accreditations']??0)!==1) fail('Operational reports API failed.',$report);
+
+    $wallet=request('POST','/api/v1/public/confirmations/'.rawurlencode((string)$registrationResult['confirmation_token']).'/wallet',[
+        'platform'=>'google',
+    ])['data'];
+    if(($wallet['platform']??'')!=='google') fail('Wallet issuance API failed.',$wallet);
+
+    $devKey=request('POST','/api/v1/developer/keys',[
+        'name'=>'HTTP integration','event_id'=>$eventId,'scopes'=>['events.read','attendees.read'],
+    ],$csrf)['data'];
+    if(!str_starts_with((string)($devKey['key']??''),'dsk_')) fail('Developer API key creation failed.',$devKey);
+    $developerAttendees=request('GET','/api/v1/developer/v1/events/'.rawurlencode($eventId).'/attendees',null,'',[
+        'X-DigiSangam-Key: '.$devKey['key'],
+    ])['data'];
+    if(count($developerAttendees)<2) fail('Developer API attendee endpoint failed.',$developerAttendees);
+
+    $webhook=request('POST','/api/v1/developer/webhooks',[
+        'event_id'=>$eventId,'url'=>'https://example.invalid/digisangam','events'=>['attendee.checked_in'],
+    ],$csrf)['data'];
+    if(empty($webhook['secret'])) fail('Webhook creation did not issue signing secret.',$webhook);
+    $webhooks=request('GET','/api/v1/developer/webhooks?event_id='.rawurlencode($eventId))['data'];
+    if(isset($webhooks[0]['secret'])||empty($webhooks[0]['secret_configured'])) fail('Webhook list leaked signing secret.',$webhooks);
 
     fwrite(STDOUT,"DigiSangam HTTP API E2E audit passed.\n");
 } finally {
