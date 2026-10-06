@@ -37,8 +37,11 @@ final class CampaignRepository
             'schedule_at'=>trim((string)($input['schedule_at']??'')),
             'timezone'=>$timezone,
             'status'=>'draft',
+            'queued_count'=>0,
             'sent_count'=>0,
+            'simulated_count'=>0,
             'failed_count'=>0,
+            'skipped_count'=>0,
             'created_at'=>date(DATE_ATOM),
         ];
         $rows=$this->all();
@@ -56,10 +59,10 @@ final class CampaignRepository
                 if(array_key_exists($field,$input)) $row[$field]=is_string($input[$field])?trim((string)$input[$field]):$input[$field];
             }
             if(!in_array((string)($row['channel']??''),['email','whatsapp'],true)) throw new \InvalidArgumentException('Unsupported campaign channel.');
-            if(!in_array((string)($row['status']??''),['draft','queued','scheduled','sent','failed','cancelled'],true)) throw new \InvalidArgumentException('Invalid campaign status.');
+            if(!in_array((string)($row['status']??''),['draft','queued','scheduled','sent','simulated','failed','cancelled'],true)) throw new \InvalidArgumentException('Invalid campaign status.');
             try{new \DateTimeZone((string)($row['timezone']??'UTC'));}catch(\Throwable){throw new \InvalidArgumentException('Invalid campaign timezone.');}
             if(isset($input['segment'])&&is_array($input['segment'])) $row['segment']=$input['segment'];
-            foreach(['sent_count','failed_count'] as $field) if(array_key_exists($field,$input)) $row[$field]=max(0,(int)$input[$field]);
+            foreach(['queued_count','sent_count','simulated_count','failed_count','skipped_count'] as $field) if(array_key_exists($field,$input)) $row[$field]=max(0,(int)$input[$field]);
             $row['updated_at']=date(DATE_ATOM);
             $updated=$row;
             break;
