@@ -11,7 +11,7 @@ final class AttendeeRepository
 
     public function all(): array
     {
-        return $this->store->read('attendees/index.json', self::demo());
+        return $this->store->read('attendees/index.json', []);
     }
 
     public function find(string $id): ?array
