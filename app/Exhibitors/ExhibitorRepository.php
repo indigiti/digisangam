@@ -11,7 +11,7 @@ final class ExhibitorRepository
 
     public function all(): array
     {
-        return $this->store->read('exhibitors/index.json', self::defaults());
+        return $this->store->read('exhibitors/index.json', []);
     }
 
     public function create(array $input): array
