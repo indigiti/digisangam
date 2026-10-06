@@ -15,6 +15,14 @@ async function publicRequest(path,options={}){
   return parseResponse(response)
 }
 
+async function uploadRequest(path,formData,{publicMode=false}={}){
+  const auth=useAuthStore()
+  const headers={}
+  if(!publicMode&&auth.csrf) headers['X-CSRF-Token']=auth.csrf
+  const response=await fetch(apiBase+path,{method:'POST',credentials:'same-origin',headers,body:formData})
+  return parseResponse(response)
+}
+
 async function request(path,options={}){
   const auth=useAuthStore()
   const method=(options.method||'GET').toUpperCase()
@@ -103,6 +111,33 @@ export const api={
   createOrder:(payload)=>request('/orders',{method:'POST',body:JSON.stringify(payload)}),
   captureOrder:(id,payload={})=>request('/orders/'+encodeURIComponent(id)+'/capture',{method:'POST',body:JSON.stringify(payload)}),
   refundOrder:(id,payload={})=>request('/orders/'+encodeURIComponent(id)+'/refund',{method:'POST',body:JSON.stringify(payload)}),
+  accreditation:(eventId)=>request('/accreditation?event_id='+encodeURIComponent(eventId)),
+  createAccreditation:(payload)=>request('/accreditation',{method:'POST',body:JSON.stringify(payload)}),
+  updateAccreditation:(id,payload)=>request('/accreditation/'+encodeURIComponent(id),{method:'PATCH',body:JSON.stringify(payload)}),
+  walkIn:(payload)=>request('/onground/walk-in',{method:'POST',body:JSON.stringify(payload)}),
+  reports:(eventId)=>request('/reports?event_id='+encodeURIComponent(eventId)),
+  reportExportUrl:(eventId,type)=>apiBase+'/reports/export?event_id='+encodeURIComponent(eventId)+'&type='+encodeURIComponent(type),
+  eventBlueprint:(prompt)=>request('/intelligence/event-builder',{method:'POST',body:JSON.stringify({prompt})}),
+  uploadMedia:(eventId,file,kind='asset',isPublic=true)=>{
+    const data=new FormData();data.append('event_id',eventId);data.append('kind',kind);data.append('public',isPublic?'1':'');data.append('file',file)
+    return uploadRequest('/media',data)
+  },
+  publicUploadMedia:(eventId,file,kind='registration_file')=>{
+    const data=new FormData();data.append('kind',kind);data.append('file',file)
+    return uploadRequest('/public/events/'+encodeURIComponent(eventId)+'/media',data,{publicMode:true})
+  },
+  publicMediaUrl:(id)=>apiBase+'/public/media/'+encodeURIComponent(id),
+  issueWallet:(token,platform)=>publicRequest('/public/confirmations/'+encodeURIComponent(token)+'/wallet',{method:'POST',body:JSON.stringify({platform})}),
+  walletPasses:(eventId)=>request('/wallet-passes?event_id='+encodeURIComponent(eventId)),
+  credentialBindings:(eventId)=>request('/credential-bindings?event_id='+encodeURIComponent(eventId)),
+  bindCredential:(payload)=>request('/credential-bindings',{method:'POST',body:JSON.stringify(payload)}),
+  revokeCredentialBinding:(id)=>request('/credential-bindings/'+encodeURIComponent(id)+'/revoke',{method:'POST',body:'{}'}),
+  developerKeys:()=>request('/developer/keys'),
+  createDeveloperKey:(payload)=>request('/developer/keys',{method:'POST',body:JSON.stringify(payload)}),
+  revokeDeveloperKey:(id)=>request('/developer/keys/'+encodeURIComponent(id)+'/revoke',{method:'POST',body:'{}'}),
+  developerWebhooks:(eventId)=>request('/developer/webhooks?event_id='+encodeURIComponent(eventId)),
+  createDeveloperWebhook:(payload)=>request('/developer/webhooks',{method:'POST',body:JSON.stringify(payload)}),
+  updateDeveloperWebhook:(id,payload)=>request('/developer/webhooks/'+encodeURIComponent(id),{method:'PATCH',body:JSON.stringify(payload)}),
   workspace:()=>request('/workspace'),
   updateWorkspace:(payload)=>request('/workspace',{method:'PATCH',body:JSON.stringify(payload)}),
   team:()=>request('/team'),
