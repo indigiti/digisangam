@@ -18,7 +18,7 @@ final class ExhibitorRepository
     {
         $record=[
             'id'=>'exh_'.bin2hex(random_bytes(6)),
-            'event_id'=>(string)($input['event_id']??'evt_001'),
+            'event_id'=>trim((string)($input['event_id'] ?? '')),
             'name'=>trim((string)($input['name']??'New Exhibitor')),
             'type'=>(string)($input['type']??'Exhibitor'),
             'booth'=>(string)($input['booth']??''),
@@ -29,6 +29,7 @@ final class ExhibitorRepository
             'status'=>(string)($input['status']??'active'),
             'created_at'=>date(DATE_ATOM),
         ];
+        if(($record['event_id']??'')==='') throw new \InvalidArgumentException('Event is required.');
         $rows=$this->all(); array_unshift($rows,$record);
         $this->store->write('exhibitors/index.json',$rows);
         return $record;
