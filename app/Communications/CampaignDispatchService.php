@@ -47,7 +47,7 @@ final class CampaignDispatchService
         }
 
         $updated=$this->campaigns->update($campaignId,[
-            'status'=>$campaign['schedule_at']??'' ? 'scheduled' : 'queued',
+            'status'=>!empty($campaign['schedule_at']) ? 'scheduled' : 'queued',
             'sent_count'=>$queued,
             'failed_count'=>$skipped,
         ]);
