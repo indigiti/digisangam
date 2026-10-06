@@ -97,6 +97,34 @@ $eventView=static function(array $event) use ($store): array {
     return $event;
 };
 
+$requireEvent=static function(string $eventId) use ($store): array {
+    $eventId=trim($eventId);
+    if($eventId==='') throw new InvalidArgumentException('Event is required.');
+    $event=(new EventRepository($store))->find($eventId);
+    if(!$event) throw new InvalidArgumentException('Event not found.');
+    return $event;
+};
+
+$assertPublishable=static function(array $candidate) use ($store): void {
+    $eventId=(string)($candidate['id']??'');
+    $errors=[];
+    if(trim((string)($candidate['name']??''))==='') $errors[]='event name';
+    if(trim((string)($candidate['start_date']??''))==='') $errors[]='start date';
+    if(($candidate['format']??'in_person')!=='virtual' && trim((string)($candidate['location']??''))==='') $errors[]='location';
+    if(trim((string)($candidate['branding']['brand_name']??''))==='') $errors[]='brand name';
+
+    $schema=(new RegistrationRepository($store))->schema($eventId);
+    if(empty($schema['fields'])) $errors[]='registration fields';
+    if(empty($schema['categories'])) $errors[]='registration categories';
+
+    $tickets=array_values(array_filter((new TicketRepository($store))->all(),static fn(array $row): bool =>
+        ($row['event_id']??'')===$eventId && ($row['status']??'')==='Active'
+    ));
+    if($tickets===[]) $errors[]='at least one active ticket';
+
+    if($errors!==[]) throw new InvalidArgumentException('Event cannot be published until configured: '.implode(', ',$errors).'.');
+};
+
 $credentialSecret = static function () use ($store): string {
     $env = trim((string)getenv('DIGISANGAM_CREDENTIAL_SECRET'));
     if ($env !== '') return $env;
@@ -484,10 +512,15 @@ try {
         }
         if (in_array($method, ['PUT','PATCH'], true)) {
             $auth->requirePermission('events.manage');
-            $event = $events->update($eventId,$body());
+            $input=$body();
+            $existing=$events->find($eventId);
+            if(!$existing) JsonResponse::send(['error'=>'Event not found.'],404);
+            $candidate=array_replace_recursive($existing,$input);
+            if(in_array((string)($candidate['status']??''),['Published','Live'],true)) $assertPublishable($candidate);
+            $event = $events->update($eventId,$input);
             if (!$event) JsonResponse::send(['error'=>'Event not found.'],404);
-            $journal->append('event.updated',['event_id'=>$eventId]);
-            JsonResponse::send($event);
+            $journal->append('event.updated',['event_id'=>$eventId,'status'=>$event['status']??null]);
+            JsonResponse::send($eventView($event));
         }
     }
 
@@ -528,8 +561,18 @@ try {
     }
     if ($method === 'POST' && $path === '/attendees') {
         $auth->requirePermission('attendees.manage');
-        $record=$attendees->create($body());
-        $journal->append('attendee.created',['attendee_id'=>$record['id']]);
+        $input=$body();
+        $event=$requireEvent((string)($input['event_id']??''));
+        $schema=(new RegistrationRepository($store))->schema((string)$event['id']);
+        $category=trim((string)($input['category']??'General'));
+        if(!in_array($category,(array)($schema['categories']??[]),true)) throw new InvalidArgumentException('Attendee category is not configured for this event.');
+        $ticketId=trim((string)($input['ticket_id']??''));
+        if($ticketId!==''){
+            $ticket=(new TicketRepository($store))->find($ticketId);
+            if(!$ticket || ($ticket['event_id']??'')!==$event['id']) throw new InvalidArgumentException('Ticket does not belong to this event.');
+        }
+        $record=$attendees->create($input);
+        $journal->append('attendee.created',['attendee_id'=>$record['id'],'event_id'=>$record['event_id']]);
         JsonResponse::send($record,201);
     }
     if ($method === 'GET' && $path === '/attendees/export') {
@@ -588,8 +631,10 @@ try {
     }
     if ($method === 'POST' && $path === '/tickets') {
         $auth->requirePermission('tickets.manage');
-        $ticket=$tickets->create($body());
-        $journal->append('ticket.created',['ticket_id'=>$ticket['id']]);
+        $input=$body();
+        $requireEvent((string)($input['event_id']??''));
+        $ticket=$tickets->create($input);
+        $journal->append('ticket.created',['ticket_id'=>$ticket['id'],'event_id'=>$ticket['event_id']]);
         JsonResponse::send($ticket,201);
     }
     if (preg_match('#^/tickets/([^/]+)$#',$path,$m) && in_array($method,['PUT','PATCH'],true)) {
@@ -607,8 +652,21 @@ try {
     }
     if ($method === 'POST' && $path === '/orders') {
         $auth->requirePermission('commerce.manage');
-        $order=$orders->create($body());
-        $journal->append('order.created',['order_id'=>$order['id'],'amount'=>$order['amount']]);
+        $input=$body();
+        $event=$requireEvent((string)($input['event_id']??''));
+        $attendeeId=trim((string)($input['attendee_id']??''));
+        if($attendeeId!==''){
+            $attendee=(new AttendeeRepository($store))->find($attendeeId);
+            if(!$attendee || ($attendee['event_id']??'')!==$event['id']) throw new InvalidArgumentException('Attendee does not belong to this event.');
+        }
+        $ticketId=trim((string)($input['ticket_id']??''));
+        if($ticketId!==''){
+            $ticket=(new TicketRepository($store))->find($ticketId);
+            if(!$ticket || ($ticket['event_id']??'')!==$event['id']) throw new InvalidArgumentException('Ticket does not belong to this event.');
+        }
+        $input['currency']=strtoupper((string)($input['currency']??$event['currency']??'INR'));
+        $order=$orders->create($input);
+        $journal->append('order.created',['order_id'=>$order['id'],'amount'=>$order['amount'],'event_id'=>$order['event_id']]);
         JsonResponse::send($order,201);
     }
 
