@@ -51,6 +51,18 @@ try{
     $csrf=(string)($setup['csrf_token']??'');
     if($csrf==='') fail('Setup did not issue CSRF token.',$setup);
 
+    $team=request('GET','/api/v1/team')['data'];
+    if(count($team['users']??[])!==1||!in_array('event_manager',$team['roles']??[],true)) fail('Team/RBAC bootstrap is incorrect.',$team);
+    $member=request('POST','/api/v1/team',[
+        'name'=>'E2E Event Manager',
+        'email'=>'manager@example.test',
+        'password'=>'StrongPass456!',
+        'role'=>'viewer',
+    ],$csrf)['data'];
+    if(($member['role']??'')!=='viewer'||isset($member['password_hash'])) fail('Team user creation leaked/returned invalid data.',$member);
+    $member=request('PATCH','/api/v1/team/'.rawurlencode((string)$member['id']),['role'=>'event_manager'],$csrf)['data'];
+    if(($member['role']??'')!=='event_manager') fail('Team role update failed.',$member);
+
     $event=request('POST','/api/v1/events',[
         'name'=>'HTTP Audit Summit',
         'description'=>'Created through the production API entrypoint.',
@@ -133,6 +145,9 @@ try{
     $dashboard=request('GET','/api/v1/dashboard?event_id='.rawurlencode($eventId))['data'];
     if(($dashboard['metrics']['registrations']??0)!==1) fail('Dashboard registration metric incorrect.',$dashboard);
     if(($dashboard['metrics']['checked_in']??0)!==1) fail('Dashboard check-in metric incorrect.',$dashboard);
+
+    $intelligence=request('GET','/api/v1/intelligence/overview?event_id='.rawurlencode($eventId))['data'];
+    if(($intelligence['event_id']??'')!==$eventId) fail('Intelligence is not scoped to the selected event.',$intelligence);
 
     $event2=request('POST','/api/v1/events',[
         'name'=>'Isolation Event',
