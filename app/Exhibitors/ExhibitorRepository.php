@@ -29,8 +29,9 @@ final class ExhibitorRepository
             'status'=>(string)($input['status']??'active'),
             'created_at'=>date(DATE_ATOM),
         ];
-        if(($record['event_id']??'')==='') throw new \InvalidArgumentException('Event is required.');
-        if(($record['event_id']??'')==='') throw new \InvalidArgumentException('Event is required.');
+        if($record['event_id']==='') throw new \InvalidArgumentException('Event is required.');
+        if($record['name']==='') throw new \InvalidArgumentException('Exhibitor name is required.');
+        if($record['contact_email']!=='' && !filter_var($record['contact_email'],FILTER_VALIDATE_EMAIL)) throw new \InvalidArgumentException('Contact email is invalid.');
         $rows=$this->all(); array_unshift($rows,$record);
         $this->store->write('exhibitors/index.json',$rows);
         return $record;
@@ -49,11 +50,4 @@ final class ExhibitorRepository
         return $updated;
     }
 
-    private static function defaults(): array
-    {
-        return [
-            ['id'=>'exh_001','event_id'=>'evt_001','name'=>'Nova Systems','type'=>'Sponsor','booth'=>'A12','contact_name'=>'Riya Shah','contact_email'=>'riya@example.test','staff_quota'=>12,'lead_quota'=>500,'status'=>'active'],
-            ['id'=>'exh_002','event_id'=>'evt_001','name'=>'CloudForge','type'=>'Exhibitor','booth'=>'B07','contact_name'=>'Karan Mehta','contact_email'=>'karan@example.test','staff_quota'=>6,'lead_quota'=>250,'status'=>'active'],
-        ];
-    }
 }
