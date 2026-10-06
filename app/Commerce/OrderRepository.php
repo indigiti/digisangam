@@ -20,6 +20,13 @@ final class OrderRepository
         return null;
     }
 
+    public function findByProviderOrderId(string $providerOrderId): ?array
+    {
+        if($providerOrderId==='') return null;
+        foreach($this->all() as $row) if(($row['provider_order_id']??'')===$providerOrderId) return $row;
+        return null;
+    }
+
     public function findLatestByAttendee(string $attendeeId): ?array
     {
         foreach($this->all() as $row) if(($row['attendee_id']??'')===$attendeeId) return $row;
