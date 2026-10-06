@@ -773,7 +773,7 @@ try {
         $decoded=CsvService::decode((string)($input['csv'] ?? ''));
         $importEvent=trim((string)($input['event_id']??$eventQuery));
         if($importEvent==='') JsonResponse::send(['error'=>'Event is required for import.'],422);
-        $decoded=array_map(static fn(array $row): array => $row+['event_id'=>$importEvent],$decoded);
+        $decoded=array_map(static fn(array $row): array => $row+['event_id'=>$importEvent,'source'=>'import'],$decoded);
         $result=$attendees->import($decoded);
         $journal->append('attendees.imported',['created'=>$result['created'],'skipped'=>$result['skipped']]);
         JsonResponse::send($result);
