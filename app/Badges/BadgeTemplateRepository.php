@@ -11,7 +11,7 @@ final class BadgeTemplateRepository
 
     public function all(): array
     {
-        return $this->store->read('badges/templates.json', self::defaults());
+        return $this->store->read('badges/templates.json', []);
     }
 
     public function create(array $input): array
