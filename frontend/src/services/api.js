@@ -1,9 +1,6 @@
-import * as demo from '../data/demo'
 import { useAuthStore } from '../stores/auth'
 
 const apiBase=(import.meta.env.BASE_URL||'/').replace(/\/$/,'')+'/api/v1'
-
-const fallback={'/dashboard':demo.dashboard,'/events':demo.events,'/attendees':demo.attendees,'/tickets':demo.tickets}
 
 async function parseResponse(response){
   const text=await response.text()
@@ -24,14 +21,14 @@ async function request(path,options={}){
   const headers={'Content-Type':'application/json',...(options.headers||{})}
   if(!['GET','HEAD'].includes(method)&&auth.csrf) headers['X-CSRF-Token']=auth.csrf
   try{
-    const response=await fetch('/api/v1'+path,{credentials:'same-origin',headers,...options})
+    const response=await fetch(apiBase+path,{credentials:'same-origin',headers,...options})
     if(response.status===401||response.status===428){
       auth.user=null
-      if(location.pathname!=='/access') location.assign('/access')
+      const access=(import.meta.env.BASE_URL||'/')+'access'
+      if(!location.pathname.endsWith('/access')) location.assign(access)
     }
     return await parseResponse(response)
   }catch(error){
-    if(import.meta.env.DEV&&method==='GET'&&Object.prototype.hasOwnProperty.call(fallback,path)) return structuredClone(fallback[path])
     throw error
   }
 }
@@ -42,11 +39,11 @@ export const api={
   publicVerifyRazorpay:(payload)=>publicRequest('/public/payments/razorpay/verify',{method:'POST',body:JSON.stringify(payload)}),
   publicConfirmation:(token)=>publicRequest('/public/confirmations/'+encodeURIComponent(token)),
   publicConcierge:(token,question)=>publicRequest('/public/concierge/'+encodeURIComponent(token),{method:'POST',body:JSON.stringify({question})}),
-  dashboard:()=>request('/dashboard'),
+  dashboard:(eventId='')=>request('/dashboard'+(eventId?'?event_id='+encodeURIComponent(eventId):'')),
   intelligenceOverview:(eventId='evt_001')=>request('/intelligence/overview?event_id='+encodeURIComponent(eventId)),
   intelligenceGraph:(eventId='evt_001')=>request('/intelligence/graph?event_id='+encodeURIComponent(eventId)),
   copilot:(payload)=>request('/intelligence/copilot',{method:'POST',body:JSON.stringify(payload)}),
-  intelligenceActions:()=>request('/intelligence/actions'),
+  intelligenceActions:(eventId='')=>request('/intelligence/actions'+(eventId?'?event_id='+encodeURIComponent(eventId):'')),
   createIntelligenceAction:(payload)=>request('/intelligence/actions',{method:'POST',body:JSON.stringify(payload)}),
   decideIntelligenceAction:(id,decision)=>request('/intelligence/actions/'+encodeURIComponent(id)+'/'+(decision==='approved'?'approve':'reject'),{method:'POST',body:'{}'}),
   events:()=>request('/events'),
@@ -55,9 +52,9 @@ export const api={
   updateEvent:(id,payload)=>request('/events/'+encodeURIComponent(id),{method:'PATCH',body:JSON.stringify(payload)}),
   registration:(eventId='evt_001')=>request('/events/'+encodeURIComponent(eventId)+'/registration'),
   saveRegistration:(eventId,payload)=>request('/events/'+encodeURIComponent(eventId)+'/registration',{method:'PUT',body:JSON.stringify(payload)}),
-  invitations:()=>request('/invitations'),
+  invitations:(eventId='')=>request('/invitations'+(eventId?'?event_id='+encodeURIComponent(eventId):'')),
   createInvitation:(payload)=>request('/invitations',{method:'POST',body:JSON.stringify(payload)}),
-  attendees:()=>request('/attendees'),
+  attendees:(eventId='')=>request('/attendees'+(eventId?'?event_id='+encodeURIComponent(eventId):'')),
   attendee:(id)=>request('/attendees/'+encodeURIComponent(id)),
   createAttendee:(payload)=>request('/attendees',{method:'POST',body:JSON.stringify(payload)}),
   updateAttendee:(id,payload)=>request('/attendees/'+encodeURIComponent(id),{method:'PATCH',body:JSON.stringify(payload)}),
@@ -67,29 +64,29 @@ export const api={
   scannerCheckin:(payload,zone_id='')=>request('/scanner/checkin',{method:'POST',body:JSON.stringify({payload,zone_id})}),
   ongroundSnapshot:(eventId)=>request('/onground/snapshot/'+encodeURIComponent(eventId)),
   ongroundSync:(items)=>request('/onground/sync',{method:'POST',body:JSON.stringify({items})}),
-  campaigns:()=>request('/campaigns'),
+  campaigns:(eventId='')=>request('/campaigns'+(eventId?'?event_id='+encodeURIComponent(eventId):'')),
   createCampaign:(payload)=>request('/campaigns',{method:'POST',body:JSON.stringify(payload)}),
   updateCampaign:(id,payload)=>request('/campaigns/'+encodeURIComponent(id),{method:'PATCH',body:JSON.stringify(payload)}),
   dispatchCampaign:(id)=>request('/campaigns/'+encodeURIComponent(id)+'/dispatch',{method:'POST',body:'{}'}),
-  automations:()=>request('/automations'),
+  automations:(eventId='')=>request('/automations'+(eventId?'?event_id='+encodeURIComponent(eventId):'')),
   createAutomation:(payload)=>request('/automations',{method:'POST',body:JSON.stringify(payload)}),
   updateAutomation:(id,payload)=>request('/automations/'+encodeURIComponent(id),{method:'PATCH',body:JSON.stringify(payload)}),
   fireAutomation:(payload)=>request('/automations/fire',{method:'POST',body:JSON.stringify(payload)}),
-  badges:()=>request('/badges'),
-  badgePrints:()=>request('/badge-prints'),
+  badges:(eventId='')=>request('/badges'+(eventId?'?event_id='+encodeURIComponent(eventId):'')),
+  badgePrints:(eventId='')=>request('/badge-prints'+(eventId?'?event_id='+encodeURIComponent(eventId):'')),
   createBadgePrint:(payload)=>request('/badge-prints',{method:'POST',body:JSON.stringify(payload)}),
   updateBadgePrint:(id,payload)=>request('/badge-prints/'+encodeURIComponent(id),{method:'PATCH',body:JSON.stringify(payload)}),
   createBadge:(payload)=>request('/badges',{method:'POST',body:JSON.stringify(payload)}),
   updateBadge:(id,payload)=>request('/badges/'+encodeURIComponent(id),{method:'PATCH',body:JSON.stringify(payload)}),
-  sessions:()=>request('/sessions'),
+  sessions:(eventId='')=>request('/sessions'+(eventId?'?event_id='+encodeURIComponent(eventId):'')),
   sessionAttendance:(id)=>request('/sessions/'+encodeURIComponent(id)+'/attendance'),
   sessionEnter:(id,payload)=>request('/sessions/'+encodeURIComponent(id)+'/enter',{method:'POST',body:JSON.stringify({payload})}),
   createSession:(payload)=>request('/sessions',{method:'POST',body:JSON.stringify(payload)}),
   updateSession:(id,payload)=>request('/sessions/'+encodeURIComponent(id),{method:'PATCH',body:JSON.stringify(payload)}),
-  exhibitors:()=>request('/exhibitors'),
-  leads:()=>request('/leads'),
+  exhibitors:(eventId='')=>request('/exhibitors'+(eventId?'?event_id='+encodeURIComponent(eventId):'')),
+  leads:(eventId='')=>request('/leads'+(eventId?'?event_id='+encodeURIComponent(eventId):'')),
   createLead:(payload)=>request('/leads',{method:'POST',body:JSON.stringify(payload)}),
-  meetings:()=>request('/meetings'),
+  meetings:(eventId='')=>request('/meetings'+(eventId?'?event_id='+encodeURIComponent(eventId):'')),
   createMeeting:(payload)=>request('/meetings',{method:'POST',body:JSON.stringify(payload)}),
   updateMeeting:(id,payload)=>request('/meetings/'+encodeURIComponent(id),{method:'PATCH',body:JSON.stringify(payload)}),
   createExhibitor:(payload)=>request('/exhibitors',{method:'POST',body:JSON.stringify(payload)}),
@@ -98,11 +95,12 @@ export const api={
   seatAssignments:(eventId)=>request('/venue/'+encodeURIComponent(eventId)+'/seats'),
   assignSeat:(eventId,payload)=>request('/venue/'+encodeURIComponent(eventId)+'/seats',{method:'POST',body:JSON.stringify(payload)}),
   updateVenue:(eventId,payload)=>request('/venue/'+encodeURIComponent(eventId),{method:'PATCH',body:JSON.stringify(payload)}),
-  tickets:()=>request('/tickets'),
+  tickets:(eventId='')=>request('/tickets'+(eventId?'?event_id='+encodeURIComponent(eventId):'')),
   createTicket:(payload)=>request('/tickets',{method:'POST',body:JSON.stringify(payload)}),
   updateTicket:(id,payload)=>request('/tickets/'+encodeURIComponent(id),{method:'PATCH',body:JSON.stringify(payload)}),
-  orders:()=>request('/orders'),
+  orders:(eventId='')=>request('/orders'+(eventId?'?event_id='+encodeURIComponent(eventId):'')),
   createOrder:(payload)=>request('/orders',{method:'POST',body:JSON.stringify(payload)}),
   workspace:()=>request('/workspace'),
   updateWorkspace:(payload)=>request('/workspace',{method:'PATCH',body:JSON.stringify(payload)}),
+  attendeeExportUrl:(eventId='')=>apiBase+'/attendees/export'+(eventId?'?event_id='+encodeURIComponent(eventId):''),
 }
