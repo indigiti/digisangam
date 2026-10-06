@@ -26,6 +26,11 @@ final class OperationalReportService
         $accr=$this->eventRows((new AccreditationRepository($this->store))->all(),$eventId);
         $sessions=$this->eventRows((new SessionRepository($this->store))->all(),$eventId);
         $sessionAttendance=0;foreach($sessions as $s)$sessionAttendance+=count((new SessionAttendanceRepository($this->store))->all((string)$s['id']));
+        $breakdown=static function(array $rows,string $field): array {
+            $out=[];foreach($rows as $row){$key=(string)($row[$field]??'Unknown');$out[$key]=($out[$key]??0)+1;}arsort($out);return $out;
+        };
+        $sessionBreakdown=[];
+        foreach($sessions as $session)$sessionBreakdown[(string)($session['title']??$session['id'])]=count((new SessionAttendanceRepository($this->store))->all((string)$session['id']));
         return [
             'registrations'=>count($att),
             'confirmed'=>count(array_filter($att,fn($x)=>($x['status']??'')==='Confirmed')),
@@ -35,6 +40,14 @@ final class OperationalReportService
             'leads'=>count($leads),'hot_leads'=>count(array_filter($leads,fn($x)=>($x['intent']??'')==='hot')),
             'accreditations'=>count($accr),'approved_accreditations'=>count(array_filter($accr,fn($x)=>in_array(($x['status']??''),['approved','activated'],true))),
             'session_entries'=>$sessionAttendance,
+            'breakdowns'=>[
+                'attendee_categories'=>$breakdown($att,'category'),
+                'registration_sources'=>$breakdown($att,'source'),
+                'payment_status'=>$breakdown($orders,'status'),
+                'lead_intent'=>$breakdown($leads,'intent'),
+                'accreditation_status'=>$breakdown($accr,'status'),
+                'session_attendance'=>$sessionBreakdown,
+            ],
         ];
     }
 
