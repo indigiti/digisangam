@@ -6,7 +6,7 @@ DigiSangam is a next-generation Event Operating System built as a modular, frame
 
 1. **Phase 1 — EventOS Core**: platform foundation, event management, registration, attendees, ticketing, commerce, public checkout, signed QR credentials and analytics.
 2. **Phase 2 — EventOS Operations**: communications, automation, badge production, offline onsite operations, agenda/session entry, exhibitors/sponsors, leads/meetings, venue zones and reserved seating.
-3. **Phase 3 — EventOS Intelligence**: Python intelligence services, AI copilots, recommendations, forecasting, lead scoring and advanced real-time operations.
+3. **Phase 3 — EventOS Intelligence**: Event Graph, Python intelligence service, Organizer Copilot, attendee Concierge, recommendations, forecasting, anomaly detection, lead scoring, crowd intelligence and approval-governed AI actions.
 
 ## Technical direction
 
@@ -56,6 +56,25 @@ DigiSangam is a next-generation Event Operating System built as a modular, frame
 - Duplicate event/session check-in prevention
 - Expanded Phase 2 smoke coverage
 
+## Phase 3 implemented
+
+- Authoritative Event Graph assembled from attendees, orders, tickets, sessions, exhibitors, leads, meetings, seating, event check-ins and session attendance
+- Python/FastAPI intelligence service with Docker packaging
+- Resilient PHP intelligence fallback when Python is unavailable
+- Registration and 7-day footfall forecasting
+- Payment and approval anomaly detection
+- AI-ranked exhibitor leads
+- Personalized session and exhibitor recommendations
+- Organizer Copilot grounded in current Event Graph metrics
+- Private attendee Concierge scoped by confirmation token
+- Live crowd intelligence using zone movement events rather than first-gate state
+- Digital Twin zone occupancy, risk levels and intervention recommendations
+- Intelligence Center admin UI
+- RBAC permissions for intelligence view/use/manage
+- Approval-governed AI action queue
+- Approved safe campaign/workflow draft creation
+- Python, PHP and Vue CI coverage for Phase 3
+
 ## Runtime configuration
 
 See [.env.example](.env.example) and [docs/INTEGRATIONS.md](docs/INTEGRATIONS.md).
@@ -90,6 +109,6 @@ Before venue connectivity becomes unreliable:
 
 ## Current status
 
-Phase 1 EventOS Core and the Phase 2 EventOS Operations core are implemented. External payment/email/WhatsApp delivery becomes live after server environment credentials and provider-side configuration are supplied.
+Phase 1 EventOS Core, Phase 2 EventOS Operations, and Phase 3 EventOS Intelligence are implemented. External payment/email/WhatsApp delivery becomes live after server environment credentials and provider-side configuration are supplied. The Python intelligence service is optional at runtime because DigiSangam retains a deterministic PHP fallback.
 
 Apple Wallet / Google Wallet credential issuance, native printer drivers, NFC/RFID and accreditation hardware integrations remain external-provider/hardware integrations rather than blockers for the current Phase 2 web/PWA operations core.
