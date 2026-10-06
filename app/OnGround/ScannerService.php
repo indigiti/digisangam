@@ -5,6 +5,7 @@ namespace DigiSangam\OnGround;
 
 use DigiSangam\Attendees\AttendeeRepository;
 use DigiSangam\Commerce\OrderRepository;
+use DigiSangam\Credentials\CredentialBindingRepository;
 use DigiSangam\Credentials\CredentialService;
 
 final class ScannerService
@@ -16,11 +17,13 @@ final class ScannerService
         private readonly CheckinRepository $checkins,
         private readonly ?AccessPolicyService $accessPolicy=null,
         private readonly ?AccessEventRepository $accessEvents=null,
+        private readonly ?CredentialBindingRepository $bindings=null,
     ) {}
 
     public function verify(string $payload,string $zoneId=''): array
     {
-        $token=$this->tokenFromPayload($payload);
+        [$token,$source]=$this->resolveCredentialToken($payload);
+        if($token==='') return ['allowed'=>false,'reason'=>'INVALID_EXTERNAL_CREDENTIAL'];
         $credential=$this->credentials->verify($token);
         if(!$credential) return ['allowed'=>false,'reason'=>'INVALID_SIGNATURE'];
 
@@ -39,7 +42,7 @@ final class ScannerService
             $zone=$this->accessPolicy->evaluate((string)$attendee['event_id'],(string)($attendee['category']??''),$zoneId);
             if(empty($zone['allowed'])) return [
                 'allowed'=>false,'reason'=>$zone['reason']??'ZONE_DENIED',
-                'attendee'=>$this->publicAttendee($attendee),'event_id'=>$attendee['event_id'],'zone'=>$zone['zone']??null,
+                'attendee'=>$this->publicAttendee($attendee),'event_id'=>$attendee['event_id'],'zone'=>$zone['zone']??null,'credential_source'=>$source,
             ];
         }
 
@@ -51,6 +54,7 @@ final class ScannerService
             'event_id'=>$attendee['event_id'],
             'zone'=>$zone['zone']??null,
             'checkin'=>$existing,
+            'credential_source'=>$source,
         ];
     }
 
@@ -67,10 +71,21 @@ final class ScannerService
         return $verification + $result + ['access_event'=>$access];
     }
 
-    private function tokenFromPayload(string $payload): string
+    private function resolveCredentialToken(string $payload): array
     {
+        $payload=trim($payload);
+        foreach(['nfc','rfid'] as $type){
+            $prefix=$type.':';
+            if(str_starts_with(strtolower($payload),$prefix)){
+                if(!$this->bindings) return ['',strtoupper($type)];
+                $binding=$this->bindings->resolve($type,substr($payload,strlen($prefix)));
+                if(!$binding) return ['',strtoupper($type)];
+                $issued=$this->credentials->issue((string)$binding['attendee_id'],(string)$binding['event_id']);
+                return [(string)$issued['token'],strtoupper($type)];
+            }
+        }
         $prefix='digisangam://credential/';
-        return str_starts_with($payload,$prefix)?substr($payload,strlen($prefix)):$payload;
+        return [str_starts_with($payload,$prefix)?substr($payload,strlen($prefix)):$payload,'QR'];
     }
 
     private function publicAttendee(array $attendee): array
