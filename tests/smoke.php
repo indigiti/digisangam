@@ -14,6 +14,7 @@ use DigiSangam\OnGround\WalkInRegistrationService;
 use DigiSangam\Printing\BadgePrintWorker;
 use DigiSangam\Printing\LogPrintProvider;
 use DigiSangam\Reports\OperationalReportService;
+use DigiSangam\Reports\ReportDefinitionRepository;
 use DigiSangam\Wallet\WalletPassRepository;
 use DigiSangam\Wallet\WalletPassService;
 use DigiSangam\Agenda\SessionAccessService;
@@ -388,6 +389,12 @@ try{
     $report=$reports->summary($eventId);
     expect(($report['registrations']??0)===2 && ($report['approved_accreditations']??0)===1,'Operational report summary failed.');
     expect(str_contains($reports->export($eventId,'attendees'),'Vip User'),'Operational CSV export failed.');
+    $definition=(new ReportDefinitionRepository($store))->create([
+        'event_id'=>$eventId,'name'=>'Confirmed attendee report','dataset'=>'attendees',
+        'columns'=>['name','email','status'],'filters'=>['status'=>'Confirmed'],
+    ]);
+    $customCsv=$reports->exportDefinition($definition);
+    expect(str_contains($customCsv,'Vip User')&&!str_contains($customCsv,'General User'),'Custom report definition filtering failed.');
 
     // Walk-in registration creates a real attendee and stable credential.
     $walkin=(new WalkInRegistrationService($events,$registration,$tickets,$attendees,$orders,$credentials))->register($eventId,[
