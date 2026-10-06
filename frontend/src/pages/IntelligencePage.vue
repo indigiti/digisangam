@@ -2,7 +2,7 @@
 import { computed, onMounted, ref } from 'vue'
 import { api } from '../services/api'
 
-const eventId=ref('evt_001'),data=ref(null),loading=ref(true),error=ref('')
+const eventId=ref('evt_001'),data=ref(null),loading=ref(true),error=ref(''),actions=ref([])
 const question=ref('What needs my attention right now?'),asking=ref(false),messages=ref([])
 const analysis=computed(()=>data.value?.analysis||{})
 const metrics=computed(()=>data.value?.metrics||{})
@@ -11,7 +11,7 @@ const money=n=>new Intl.NumberFormat('en-IN',{style:'currency',currency:'INR',ma
 
 async function load(){
   loading.value=true;error.value=''
-  try{data.value=await api.intelligenceOverview(eventId.value)}
+  try{[data.value,actions.value]=await Promise.all([api.intelligenceOverview(eventId.value),api.intelligenceActions()])}
   catch(e){error.value=e.message}
   finally{loading.value=false}
 }
@@ -24,6 +24,18 @@ async function ask(text=question.value){
     messages.value.push({role:'assistant',text:r.answer,actions:r.suggested_actions||[]})
   }catch(e){messages.value.push({role:'assistant',text:e.message,actions:[]})}
   finally{asking.value=false}
+}
+async function propose(title,type='operator_note',payload={}){
+  try{
+    const row=await api.createIntelligenceAction({event_id:eventId.value,type,title,rationale:'Queued from Organizer Copilot / Intelligence Center',payload})
+    actions.value.unshift(row)
+  }catch(e){error.value=e.message}
+}
+async function decide(row,decision){
+  try{
+    const updated=await api.decideIntelligenceAction(row.id,decision)
+    Object.assign(row,updated)
+  }catch(e){error.value=e.message}
 }
 onMounted(load)
 </script>
@@ -93,12 +105,23 @@ onMounted(load)
       <div v-if="!messages.length" class="space-y-2"><button v-for="prompt in ['What needs my attention right now?','How are registrations doing?','Are any zones getting crowded?','Which exhibitor leads should we prioritize?','What is our payment health?']" :key="prompt" class="w-full rounded-xl border border-slate-200 p-3 text-left text-xs font-semibold hover:bg-slate-50" @click="ask(prompt)">{{prompt}}</button></div>
       <div v-for="(m,i) in messages" :key="i" class="rounded-2xl p-3 text-sm leading-6" :class="m.role==='user'?'ml-8 bg-indigo-600 text-white':'mr-5 bg-slate-50 text-slate-700'">
         {{m.text}}
-        <ul v-if="m.actions?.length" class="mt-2 list-disc pl-5 text-xs opacity-80"><li v-for="a in m.actions" :key="a">{{a}}</li></ul>
+        <div v-if="m.actions?.length" class="mt-3 space-y-2"><div v-for="a in m.actions" :key="a" class="flex items-start justify-between gap-2 rounded-xl bg-white/70 p-2 text-xs text-slate-600"><span>{{a}}</span><button class="shrink-0 rounded-lg border border-slate-200 px-2 py-1 font-bold" @click="propose(a)">Queue</button></div></div>
       </div>
       <div v-if="asking" class="mr-10 animate-pulse rounded-2xl bg-slate-50 p-3 text-sm text-slate-400">Analyzing Event Graph…</div>
     </div>
     <form class="border-t p-3" @submit.prevent="ask()"><div class="flex gap-2"><input v-model="question" class="control" placeholder="Ask about registrations, crowd, revenue, leads…"/><button class="btn-primary" :disabled="asking">Ask</button></div></form>
   </aside>
+</section>
+
+<section class="panel overflow-hidden">
+  <div class="flex flex-col justify-between gap-3 border-b p-5 sm:flex-row sm:items-center">
+    <div><p class="panel-kicker">AI governance</p><h2 class="panel-title">Action approval queue</h2><p class="mt-1 text-xs text-slate-400">AI suggestions never execute consequential actions directly. Approve or reject them explicitly.</p></div>
+    <div class="flex gap-2"><button class="btn-secondary" @click="propose('Draft attendee update campaign','campaign_draft',{channel:'email',template:'custom_campaign',subject:'Event update',content:'Draft prepared from Intelligence Center.',segment:{status:'Confirmed'},status:'draft'})">Queue campaign draft</button><button class="btn-secondary" @click="propose('Draft operational follow-up workflow','workflow_draft',{trigger:'attendee.checked_in',actions:[{type:'email',template:'post_checkin'}],enabled:false})">Queue workflow draft</button></div>
+  </div>
+  <div class="overflow-x-auto"><table class="data-table"><thead><tr><th>Proposal</th><th>Type</th><th>Status</th><th>Created</th><th>Decision</th></tr></thead><tbody>
+    <tr v-if="!actions.length"><td colspan="5" class="text-center">No AI action proposals queued.</td></tr>
+    <tr v-for="row in actions" :key="row.id"><td><b>{{row.title}}</b><p>{{row.rationale||'—'}}</p></td><td><span class="soft-pill">{{row.type}}</span></td><td><span class="status-badge" :class="row.status==='approved'?'badge-published':row.status==='rejected'?'bg-rose-100 text-rose-700':'badge-draft'">{{row.status}}</span></td><td>{{row.created_at?.slice(0,16).replace('T',' ')}}</td><td><div v-if="row.status==='pending'" class="flex gap-2"><button class="btn-primary py-1.5" @click="decide(row,'approved')">Approve</button><button class="btn-secondary py-1.5" @click="decide(row,'rejected')">Reject</button></div><span v-else class="text-xs text-slate-400">{{row.result?.type||'Decided'}}</span></td></tr>
+  </tbody></table></div>
 </section>
 
 <section v-if="analysis.anomalies?.length" class="panel p-6"><p class="panel-kicker">Anomaly detection</p><h2 class="panel-title">Detected deviations</h2><div class="mt-4 grid gap-3 md:grid-cols-2"><div v-for="(a,i) in analysis.anomalies" :key="i" class="rounded-2xl border border-amber-200 bg-amber-50 p-4"><div class="flex justify-between gap-3"><b class="text-sm">{{a.type.replaceAll('_',' ')}}</b><span class="status-badge bg-white text-amber-700">{{a.severity}}</span></div><p class="mt-2 text-xs leading-5 text-amber-900/70">{{a.message}}</p></div></div></section>
