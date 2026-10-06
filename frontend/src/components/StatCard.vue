@@ -1,0 +1,2 @@
+<script setup>defineProps({label:String,value:String,delta:String,tone:{type:String,default:'blue'}})</script>
+<template><article class="stat-card" :class="'stat-'+tone"><p class="text-xs font-semibold text-slate-500">{{label}}</p><div class="mt-2 flex items-end justify-between gap-4"><p class="text-2xl font-bold tracking-tight">{{value}}</p><span class="rounded-full bg-white/80 px-2 py-1 text-[11px] font-bold text-emerald-600">{{delta}}</span></div></article></template>
