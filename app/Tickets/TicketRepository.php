@@ -46,6 +46,9 @@ final class TicketRepository
             'sale_end'=>(string)($input['sale_end'] ?? ''),
             'created_at'=>date(DATE_ATOM),
         ];
+        if($record['event_id']==='') throw new \InvalidArgumentException('Event is required.');
+        if($record['name']==='') throw new \InvalidArgumentException('Ticket name is required.');
+        if($record['sale_start']!=='' && $record['sale_end']!=='' && $record['sale_end']<$record['sale_start']) throw new \InvalidArgumentException('Sale end cannot be before sale start.');
         array_unshift($rows,$record);
         $this->store->write('tickets/index.json',$rows);
         return $record;
@@ -100,16 +103,4 @@ final class TicketRepository
         }, []);
     }
 
-    private static function demo(): array
-    {
-        return [
-            ['id'=>'tic_1','name'=>'Early Bird','price'=>2499,'quantity'=>500,'sold'=>432,'status'=>'Active','event_id'=>'evt_001'],
-            ['id'=>'tic_2','name'=>'General','price'=>3999,'quantity'=>1000,'sold'=>642,'status'=>'Active','event_id'=>'evt_001'],
-            ['id'=>'tic_3','name'=>'Student','price'=>1499,'quantity'=>300,'sold'=>210,'status'=>'Active','event_id'=>'evt_001'],
-            ['id'=>'tic_4','name'=>'VIP','price'=>9999,'quantity'=>100,'sold'=>85,'status'=>'Active','event_id'=>'evt_001'],
-            ['id'=>'tic_5','name'=>'Speaker','price'=>0,'quantity'=>200,'sold'=>120,'status'=>'Active','event_id'=>'evt_001'],
-            ['id'=>'tic_6','name'=>'Sponsor Delegate','price'=>0,'quantity'=>500,'sold'=>320,'status'=>'Active','event_id'=>'evt_001'],
-            ['id'=>'tic_7','name'=>'Media','price'=>0,'quantity'=>100,'sold'=>64,'status'=>'Active','event_id'=>'evt_001'],
-        ];
-    }
 }
