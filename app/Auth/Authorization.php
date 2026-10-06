@@ -7,12 +7,21 @@ final class Authorization
 {
     private const ROLE_PERMISSIONS = [
         'super_admin' => ['*'],
-        'workspace_admin' => ['events.*','registration.*','attendees.*','tickets.*','commerce.*','analytics.view','workspace.*'],
-        'event_manager' => ['events.*','registration.*','attendees.*','tickets.*','analytics.view'],
-        'registration_manager' => ['registration.*','attendees.*','tickets.view','analytics.view'],
-        'finance' => ['tickets.view','commerce.*','analytics.view'],
-        'onsite' => ['attendees.view','attendees.checkin','tickets.view'],
-        'viewer' => ['events.view','attendees.view','tickets.view','analytics.view'],
+        'workspace_admin' => [
+            'events.*','registration.*','attendees.*','tickets.*','commerce.*','analytics.view','workspace.*',
+            'communications.*','automation.*','badges.*','agenda.*','exhibitors.*','venue.*','onground.*'
+        ],
+        'event_manager' => [
+            'events.*','registration.*','attendees.*','tickets.*','analytics.view',
+            'communications.*','automation.*','badges.*','agenda.*','exhibitors.*','venue.*','onground.view'
+        ],
+        'registration_manager' => ['registration.*','attendees.*','tickets.view','analytics.view','communications.view','badges.view','agenda.view'],
+        'finance' => ['tickets.view','commerce.*','analytics.view','exhibitors.view'],
+        'onsite' => ['attendees.view','attendees.checkin','tickets.view','onground.*','badges.view','venue.view','agenda.view'],
+        'viewer' => [
+            'events.view','attendees.view','tickets.view','analytics.view','communications.view','automation.view',
+            'badges.view','agenda.view','exhibitors.view','venue.view','onground.view'
+        ],
     ];
 
     public static function allows(string $role, string $permission): bool
