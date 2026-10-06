@@ -15,6 +15,7 @@ final class ScannerService
         private readonly OrderRepository $orders,
         private readonly CheckinRepository $checkins,
         private readonly ?AccessPolicyService $accessPolicy=null,
+        private readonly ?AccessEventRepository $accessEvents=null,
     ) {}
 
     public function verify(string $payload,string $zoneId=''): array
@@ -59,7 +60,11 @@ final class ScannerService
         if(empty($verification['allowed'])) return $verification;
         $attendee=$verification['attendee'];
         $result=$this->checkins->checkin((string)$verification['event_id'],(string)$attendee['id'],$operatorId,$zoneId);
-        return $verification + $result;
+        $access=null;
+        if($zoneId!=='' && $this->accessEvents){
+            $access=$this->accessEvents->enter((string)$verification['event_id'],(string)$attendee['id'],$zoneId,$operatorId);
+        }
+        return $verification + $result + ['access_event'=>$access];
     }
 
     private function tokenFromPayload(string $payload): string
