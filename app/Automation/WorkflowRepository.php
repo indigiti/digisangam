@@ -11,7 +11,7 @@ final class WorkflowRepository
 
     public function all(): array
     {
-        return $this->store->read('automation/workflows.json', self::defaults());
+        return $this->store->read('automation/workflows.json', []);
     }
 
     public function create(array $input): array
