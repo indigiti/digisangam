@@ -17,6 +17,7 @@ $worker=new NotificationWorker(
     NotificationProviderFactory::email(),
     NotificationProviderFactory::whatsapp(),
     new CampaignRepository($store),
+    NotificationProviderFactory::sms(),
 );
 $result=$worker->run((int)($argv[1]??25));
 fwrite(STDOUT,json_encode($result,JSON_PRETTY_PRINT|JSON_UNESCAPED_SLASHES).PHP_EOL);
