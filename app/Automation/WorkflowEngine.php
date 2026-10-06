@@ -12,7 +12,7 @@ final class WorkflowEngine
         private readonly NotificationOutbox $outbox,
     ) {}
 
-    public function fire(string $eventName,array $context): array
+    public function fire(string $eventName,array $context,bool $dryRun=false): array
     {
         $runs=[];
         foreach($this->workflows->all() as $workflow){
@@ -36,18 +36,28 @@ final class WorkflowEngine
                 if(trim((string)array_values($recipient)[0])==='') continue;
 
                 $notBefore=$delayMinutes>0 ? date(DATE_ATOM,time()+($delayMinutes*60)) : '';
-                $queued[]=$this->outbox->queue(
-                    $type,
-                    (string)($action['template']??'registration_confirmation'),
-                    $recipient,
-                    $context+['workflow_id'=>$workflow['id']],
-                    $notBefore
-                );
+                if($dryRun){
+                    $queued[]=[
+                        'dry_run'=>true,
+                        'channel'=>$type,
+                        'template'=>(string)($action['template']??'registration_confirmation'),
+                        'recipient'=>$recipient,
+                        'not_before'=>$notBefore,
+                    ];
+                }else{
+                    $queued[]=$this->outbox->queue(
+                        $type,
+                        (string)($action['template']??'registration_confirmation'),
+                        $recipient,
+                        $context+['workflow_id'=>$workflow['id']],
+                        $notBefore
+                    );
+                }
             }
 
             $runs[]=['workflow_id'=>$workflow['id'],'name'=>$workflow['name'],'queued'=>count($queued)];
         }
-        return ['trigger'=>$eventName,'matched'=>count($runs),'runs'=>$runs];
+        return ['trigger'=>$eventName,'matched'=>count($runs),'dry_run'=>$dryRun,'runs'=>$runs];
     }
 
     private function conditionsPass(array $conditions,array $context): bool
