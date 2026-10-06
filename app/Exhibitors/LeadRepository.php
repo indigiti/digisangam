@@ -29,6 +29,7 @@ final class LeadRepository
         ];
         if($record['exhibitor_id']===''||$record['attendee_id']==='') throw new \InvalidArgumentException('Exhibitor and attendee are required.');
         if(($record['event_id']??'')==='') throw new \InvalidArgumentException('Event is required.');
+        if(($record['event_id']??'')==='') throw new \InvalidArgumentException('Event is required.');
         $rows=$this->all(); array_unshift($rows,$record);
         $this->store->write('exhibitors/leads.json',$rows);
         return $record;
