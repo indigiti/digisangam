@@ -29,18 +29,32 @@ final class RegistrationCheckoutService
 
     public function publicEvent(string $eventId): array
     {
-        $event = $this->events->find($eventId);
-        if (!$event || !in_array((string)($event['status'] ?? ''), ['Published','Live'], true)) {
+        $event=$this->events->find($eventId);
+        if(!$event || !in_array((string)($event['status']??''),['Published','Live'],true)){
             throw new \RuntimeException('Event is not available for registration.');
         }
-        $schema = $this->registration->schema($eventId);
+        return $this->eventPayload($eventId,$event);
+    }
+
+    public function previewEvent(string $eventId): array
+    {
+        $event=$this->events->find($eventId);
+        if(!$event) throw new \RuntimeException('Event not found.');
+        $payload=$this->eventPayload($eventId,$event);
+        $payload['preview']=true;
+        return $payload;
+    }
+
+    private function eventPayload(string $eventId,array $event): array
+    {
+        $schema=$this->registration->schema($eventId);
         return [
             'event'=>$event,
             'registration'=>[
-                'title'=>$schema['title'] ?? 'Event Registration',
-                'approval_mode'=>$schema['approval_mode'] ?? 'auto',
-                'categories'=>$schema['categories'] ?? [],
-                'fields'=>$schema['fields'] ?? [],
+                'title'=>$schema['title']??'Event Registration',
+                'approval_mode'=>$schema['approval_mode']??'auto',
+                'categories'=>$schema['categories']??[],
+                'fields'=>$schema['fields']??[],
             ],
             'tickets'=>$this->tickets->publicForEvent($eventId),
         ];
