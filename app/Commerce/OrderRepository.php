@@ -50,8 +50,8 @@ final class OrderRepository
             'provider_order_id'=>(string)($input['provider_order_id'] ?? ''),
             'created_at'=>date(DATE_ATOM),
         ];
-        if(($record['event_id']??'')==='') throw new \InvalidArgumentException('Event is required.');
-        if(($record['event_id']??'')==='') throw new \InvalidArgumentException('Event is required.');
+        if($record['event_id']==='') throw new \InvalidArgumentException('Event is required.');
+        if(!in_array($record['status'],['pending','paid','failed','refunded'],true)) throw new \InvalidArgumentException('Invalid order status.');
         array_unshift($rows, $record);
         $this->store->write('orders/index.json', $rows);
         return $record;
@@ -62,7 +62,9 @@ final class OrderRepository
         $rows=$this->all(); $updated=null;
         foreach($rows as &$row){
             if(($row['id']??'')!==$id) continue;
-            $row['status']=(string)($payment['status'] ?? $row['status']);
+            $nextStatus=(string)($payment['status'] ?? $row['status']);
+            if(!in_array($nextStatus,['pending','paid','failed','refunded'],true)) throw new \InvalidArgumentException('Invalid payment status.');
+            $row['status']=$nextStatus;
             $row['payment_reference']=(string)($payment['payment_reference'] ?? $row['payment_reference']);
             $row['provider']=(string)($payment['provider'] ?? $row['provider']);
             if(isset($payment['provider_order_id'])) $row['provider_order_id']=(string)$payment['provider_order_id'];
