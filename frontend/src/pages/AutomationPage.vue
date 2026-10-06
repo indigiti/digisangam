@@ -1,17 +1,21 @@
 <script setup>
-import { onMounted, reactive, ref } from 'vue'
+import { computed, onMounted, reactive, ref, watch } from 'vue'
+import { useEventStore } from '../stores/event'
 import { api } from '../services/api'
 
-const rows=ref([]),selected=ref(null),show=ref(false),testResult=ref(null),busy=ref(false)
+const events=useEventStore(),rows=ref([]),selected=ref(null),show=ref(false),testResult=ref(null),busy=ref(false),error=ref('')
+const eventId=computed(()=>events.currentId)
 const triggers=['person.registered','attendee.confirmed','payment.captured','attendee.checked_in','session.entered','event.ended']
-const form=reactive({event_id:'evt_001',name:'New attendee journey',trigger:'attendee.confirmed',conditions:[],actions:[{type:'email',template:'registration_confirmation'}],enabled:false})
-onMounted(async()=>{rows.value=await api.automations();selected.value=rows.value[0]||null})
-async function create(){const row=await api.createAutomation(form);rows.value.unshift(row);selected.value=row;show.value=false}
+const form=reactive({event_id:'',name:'New attendee journey',trigger:'attendee.confirmed',conditions:[],actions:[{type:'email',template:'registration_confirmation'}],enabled:false})
+async function load(){if(!events.loaded)await events.load();rows.value=eventId.value?await api.automations(eventId.value):[];selected.value=rows.value[0]||null}
+onMounted(load);watch(eventId,load)
+async function create(){error.value='';try{form.event_id=eventId.value;const row=await api.createAutomation(form);rows.value.unshift(row);selected.value=row;show.value=false}catch(e){error.value=e.message}}
 async function toggle(row){const updated=await api.updateAutomation(row.id,{enabled:!row.enabled});Object.assign(row,updated)}
-async function test(row){busy.value=true;try{testResult.value=await api.fireAutomation({trigger:row.trigger,context:{email:'test@example.test',phone:'919999999999',event_id:row.event_id,category:'General'}})}finally{busy.value=false}}
+async function test(row){busy.value=true;try{testResult.value=await api.fireAutomation({trigger:row.trigger,context:{email:'test@example.test',phone:'919999999999',event_id:eventId.value,category:'General'}})}finally{busy.value=false}}
 </script>
 <template><div class="space-y-6">
-<section class="flex flex-col justify-between gap-4 sm:flex-row sm:items-end"><div><p class="eyebrow">Automation</p><h1 class="page-title">Workflow Engine</h1><p class="page-subtitle">Trigger → conditions → actions → wait → next action, executed through the notification outbox.</p></div><button class="btn-primary" @click="show=true">+ New Workflow</button></section>
+<section class="flex flex-col justify-between gap-4 sm:flex-row sm:items-end"><div><p class="eyebrow">Automation</p><h1 class="page-title">Workflow Engine</h1><p class="page-subtitle">{{events.current?.name||'Select an event'}} · trigger → conditions → actions.</p></div><button class="btn-primary" :disabled="!eventId" @click="show=true">+ New Workflow</button></section>
+<p v-if="error" class="rounded-xl bg-rose-50 p-4 text-sm font-semibold text-rose-700">{{error}}</p>
 <section class="grid gap-5 xl:grid-cols-[320px_1fr]">
 <aside class="panel overflow-hidden"><div class="border-b border-slate-100 p-4"><p class="panel-kicker">Workflows</p></div><button v-for="r in rows" :key="r.id" @click="selected=r" class="w-full border-b border-slate-100 p-4 text-left hover:bg-slate-50" :class="selected?.id===r.id?'bg-indigo-50':''"><div class="flex justify-between gap-3"><div><b class="text-sm">{{r.name}}</b><p class="mt-1 text-xs text-slate-400">{{r.trigger}}</p></div><span class="status-badge" :class="r.enabled?'badge-published':'badge-draft'">{{r.enabled?'Active':'Off'}}</span></div></button></aside>
 <article v-if="selected" class="panel p-6"><div class="flex flex-wrap items-start justify-between gap-3"><div><p class="panel-kicker">Workflow canvas</p><h2 class="mt-1 text-xl font-black">{{selected.name}}</h2></div><div class="flex gap-2"><button class="btn-secondary" @click="test(selected)">Test trigger</button><button class="btn-primary" @click="toggle(selected)">{{selected.enabled?'Disable':'Enable'}}</button></div></div>
