@@ -68,7 +68,6 @@ final class TicketRepository
 
     public function reserveOne(string $ticketId, string $eventId): array
     {
-        $fallback = self::demo();
         return $this->store->transaction('tickets/index.json', function(array $rows) use ($ticketId,$eventId): array {
             $reserved = null;
             foreach ($rows as &$row) {
@@ -84,7 +83,21 @@ final class TicketRepository
             unset($row);
             if ($reserved === null) throw new \RuntimeException('Ticket not found for this event.');
             return ['data'=>$rows,'result'=>$reserved];
-        }, $fallback);
+        }, self::demo());
+    }
+
+    public function releaseOne(string $ticketId,string $eventId): void
+    {
+        $this->store->transaction('tickets/index.json', function(array $rows) use ($ticketId,$eventId): array {
+            foreach($rows as &$row){
+                if(($row['id']??'')!==$ticketId || ($row['event_id']??'')!==$eventId) continue;
+                $row['sold']=max(0,(int)($row['sold']??0)-1);
+                $row['updated_at']=date(DATE_ATOM);
+                break;
+            }
+            unset($row);
+            return $rows;
+        }, self::demo());
     }
 
     private static function demo(): array
