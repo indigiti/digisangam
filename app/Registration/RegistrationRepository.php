@@ -9,7 +9,7 @@ final class RegistrationRepository
 {
     public function __construct(private readonly JsonFileStore $store) {}
 
-    public function schema(string $eventId = 'evt_001'): array
+    public function schema(string $eventId): array
     {
         return $this->store->read('registration/' . $eventId . '.json', [
             'event_id'=>$eventId,
@@ -29,6 +29,7 @@ final class RegistrationRepository
 
     public function save(string $eventId, array $input): array
     {
+        if(trim($eventId)==='') throw new \InvalidArgumentException('Event is required.');
         $schema = $this->schema($eventId);
         foreach (['title','approval_mode','categories','fields'] as $key) {
             if (array_key_exists($key, $input)) $schema[$key] = $input[$key];
