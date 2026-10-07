@@ -4,6 +4,7 @@ use DigiSangam\Attendees\AttendeeRepository;
 use DigiSangam\Badges\BadgeTemplateRepository;
 use DigiSangam\Badges\PrintJobRepository;
 use DigiSangam\Core\Storage\JsonFileStore;
+use DigiSangam\Operations\WorkerHeartbeatRepository;
 use DigiSangam\Printing\BadgePrintWorker;
 use DigiSangam\Printing\CupsPrintProvider;
 use DigiSangam\Printing\LogPrintProvider;
@@ -17,5 +18,6 @@ $provider=match($providerName){
     default=>new LogPrintProvider(),
 };
 $result=(new BadgePrintWorker(new PrintJobRepository($store),new AttendeeRepository($store),new BadgeTemplateRepository($store),$provider))->run((int)($argv[1]??20));
+(new WorkerHeartbeatRepository($store))->beat('badge-print',$result,300);
 fwrite(STDOUT,json_encode($result,JSON_PRETTY_PRINT|JSON_UNESCAPED_SLASHES).PHP_EOL);
 exit($result['failed']>0?2:0);
