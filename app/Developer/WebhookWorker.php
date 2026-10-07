@@ -17,7 +17,14 @@ final class WebhookWorker
                 curl_exec($ch);$status=(int)curl_getinfo($ch,CURLINFO_RESPONSE_CODE);$error=curl_error($ch);curl_close($ch);
                 if($error!==''||$status<200||$status>=300)throw new \RuntimeException($error!==''?$error:'Webhook HTTP '.$status);
                 $this->outbox->mark((string)$row['id'],'sent',['sent_at'=>date(DATE_ATOM),'http_status'=>$status]);$sent++;
-            }catch(\Throwable $e){$this->outbox->mark((string)$row['id'],((int)($row['attempts']??0)+1)>=5?'failed':'retry',['last_error'=>$e->getMessage()]);$failed++;}
+            }catch(\Throwable $e){
+                $attempts=(int)($row['attempts']??0)+1;
+                $this->outbox->mark((string)$row['id'],$attempts>=5?'failed':'retry',[
+                    'last_error'=>$e->getMessage(),
+                    'next_attempt_at'=>$attempts>=5?'':date(DATE_ATOM,time()+min(3600,60*(2**min($attempts,5)))),
+                ]);
+                $failed++;
+            }
         }
         return ['processed'=>$processed,'sent'=>$sent,'failed'=>$failed];
     }
