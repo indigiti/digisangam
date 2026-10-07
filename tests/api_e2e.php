@@ -120,6 +120,10 @@ try{
     if(($public['event']['branding']['brand_name']??'')!=='Audit Brand') fail('Public branding missing.',$public);
     if(count($public['tickets']??[])!==1) fail('Public ticket list is incorrect.',$public);
 
+    $discovery=request('GET','/api/v1/public/events')['data'];
+    if(($discovery['total']??0)!==1||($discovery['events'][0]['id']??'')!==$eventId) fail('Public discovery list is incorrect.',$discovery);
+    if(($discovery['events'][0]['min_price']??-1)!==0||!in_array('Technology',$discovery['categories']??[],true)) fail('Public discovery metadata is incorrect.',$discovery);
+
     $registrationResult=request('POST','/api/v1/public/events/'.rawurlencode($eventId).'/register',[
         'ticket_id'=>$ticketId,
         'answers'=>[
