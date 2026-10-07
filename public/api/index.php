@@ -48,6 +48,7 @@ use DigiSangam\OnGround\CheckinRepository;
 use DigiSangam\PublicFlow\PublicRequestGuard;
 use DigiSangam\PublicFlow\RateLimitException;
 use DigiSangam\PublicFlow\RegistrationCheckoutService;
+use DigiSangam\PublicFlow\PublicDiscoveryService;
 use DigiSangam\Registration\RegistrationRepository;
 use DigiSangam\Tickets\TicketRepository;
 use DigiSangam\Workspace\WorkspaceRepository;
@@ -255,6 +256,10 @@ try {
     if (str_starts_with($path, '/public/')) {
         if ($auth->setupRequired()) {
             JsonResponse::send(['error'=>'Event platform setup is not complete.'],503);
+        }
+
+        if ($method === 'GET' && $path === '/public/events') {
+            JsonResponse::send((new PublicDiscoveryService(new EventRepository($store),new TicketRepository($store)))->browse());
         }
 
         if ($method === 'GET' && preg_match('#^/public/events/([^/]+)$#',$path,$m)) {
