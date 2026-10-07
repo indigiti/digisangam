@@ -42,6 +42,7 @@ async function request(path,options={}){
 }
 
 export const api={
+  publicEvents:()=>publicRequest('/public/events'),
   publicEvent:(id)=>publicRequest('/public/events/'+encodeURIComponent(id)),
   publicRegister:(id,payload)=>publicRequest('/public/events/'+encodeURIComponent(id)+'/register',{method:'POST',body:JSON.stringify(payload)}),
   publicVerifyRazorpay:(payload)=>publicRequest('/public/payments/razorpay/verify',{method:'POST',body:JSON.stringify(payload)}),
