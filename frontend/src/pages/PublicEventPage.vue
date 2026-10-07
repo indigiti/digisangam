@@ -218,7 +218,7 @@ async function submit(){
               <h3 class="text-[19px] font-black">Select a ticket</h3><p class="mt-1 text-[12px] text-slate-500">Choose one available ticket type.</p>
               <div class="mt-5 grid gap-3">
                 <button v-for="ticket in data.tickets" :key="ticket.id" @click="selectedTicket=ticket.id" class="grid gap-3 rounded-[12px] border p-4 text-left transition sm:grid-cols-[1fr_auto] sm:items-center" :class="selectedTicket===ticket.id?'border-[#f84464] bg-rose-50':'border-slate-200 hover:border-rose-200'">
-                  <div><div class="flex items-center gap-2"><h4 class="text-[14px] font-black">{{ticket.name}}</h4><span v-if="ticket.quantity-ticket.sold<25" class="rounded-full bg-amber-50 px-2 py-1 text-[9px] font-bold text-amber-700">{{ticket.quantity-ticket.sold}} left</span></div><p class="mt-1 text-[11px] text-slate-500">{{ticket.quantity-ticket.sold}} available · {{ticket.status}}</p></div><strong class="text-[18px]">{{money(ticket.price)}}</strong>
+                  <div><div class="flex items-center gap-2"><h4 class="text-[14px] font-black">{{ticket.name}}</h4><span v-if="ticket.quantity-ticket.sold-(ticket.reserved||0)<25" class="rounded-full bg-amber-50 px-2 py-1 text-[9px] font-bold text-amber-700">{{ticket.quantity-ticket.sold-(ticket.reserved||0)}} left</span></div><p class="mt-1 text-[11px] text-slate-500">{{ticket.quantity-ticket.sold-(ticket.reserved||0)}} available · {{ticket.status}}</p></div><strong class="text-[18px]">{{money(ticket.price)}}</strong>
                 </button>
                 <div v-if="!data.tickets.length" class="rounded-[12px] bg-amber-50 p-5 text-[12px] text-amber-800">No tickets are currently available.</div>
               </div>
