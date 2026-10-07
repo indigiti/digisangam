@@ -5,7 +5,7 @@ import { api } from '../services/api'
 import PublicRegistrationField from '../components/PublicRegistrationField.vue'
 
 const route=useRoute(),router=useRouter()
-const loading=ref(true),busy=ref(false),error=ref(''),data=ref(null),step=ref(1),selectedTicket=ref('')
+const loading=ref(true),busy=ref(false),error=ref(''),data=ref(null),step=ref(1),selectedTicket=ref(''),invitation=ref(null)
 const previewMode=computed(()=>route.name==='event-preview')
 const answers=reactive({}),honeypot=ref(''),uploadingField=ref('')
 const money=n=>Number(n||0)===0?'Free':new Intl.NumberFormat('en-IN',{style:'currency',currency:data.value?.event?.currency||'INR',maximumFractionDigits:0}).format(n)
@@ -19,6 +19,13 @@ onMounted(async()=>{
     for(const field of fields.value) answers[field.id]=field.type==='multiselect'?[]:''
     const category=fields.value.find(x=>x.id==='fld_category')
     if(category&&data.value.registration.categories?.length) answers[category.id]=data.value.registration.categories[0]
+    const inviteToken=String(route.query.invite||'')
+    if(inviteToken){
+      invitation.value=await api.publicInvitation(inviteToken)
+      if(invitation.value.event_id!==route.params.id) throw new Error('This invitation belongs to another event.')
+      if(fields.value.some(x=>x.id==='fld_email')) answers.fld_email=invitation.value.email
+      if(fields.value.some(x=>x.id==='fld_category')&&invitation.value.category) answers.fld_category=invitation.value.category
+    }
   }catch(e){error.value=e.message}
   finally{loading.value=false}
 })
@@ -100,7 +107,7 @@ async function openRazorpay(result){
 async function submit(){
   busy.value=true;error.value=''
   try{
-    const result=await api.publicRegister(route.params.id,{ticket_id:selectedTicket.value,answers:{...answers},website:honeypot.value})
+    const result=await api.publicRegister(route.params.id,{ticket_id:selectedTicket.value,answers:{...answers},website:honeypot.value,invitation_token:String(route.query.invite||'')})
     if(result.payment?.action==='razorpay_checkout'){
       await openRazorpay(result)
     }
@@ -219,6 +226,7 @@ async function submit(){
 
             <div v-else-if="step===2">
               <h3 class="text-[19px] font-black">{{data.registration.title}}</h3><p class="mt-1 text-[12px] text-slate-500">Fields marked with * are required.</p>
+              <div v-if="invitation" class="mt-5 rounded-[10px] bg-emerald-50 p-3 text-[11px] font-semibold text-emerald-700">Invitation verified for {{invitation.email}} · {{invitation.category}}</div>
               <div class="mt-6 grid gap-5 sm:grid-cols-2"><template v-for="field in fields" :key="field.id"><PublicRegistrationField v-if="visible(field)" v-model="answers[field.id]" :field="field" :categories="data.registration.categories" :class="['paragraph','textarea','file'].includes(field.type)?'sm:col-span-2':''" @upload="uploadField(field,$event)"/><p v-if="field.type==='file'&&uploadingField===field.id" class="sm:col-span-2 text-[11px] font-semibold text-[#f84464]">Uploading file…</p></template><label class="hidden"><span>Website</span><input v-model="honeypot" tabindex="-1" autocomplete="off"/></label></div>
             </div>
 
