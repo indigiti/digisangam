@@ -173,7 +173,7 @@ final class RegistrationCheckoutService
         if(!$event||!$ticket) throw new \RuntimeException('Event or ticket is no longer available.');
 
         $reserved=$this->tickets->reserveOne((string)$ticket['id'],(string)$event['id']);
-        $order=null;
+        $order=null;$committed=false;
         try{
             $ttl=max(5,min(120,(int)(getenv('DIGISANGAM_RESERVATION_TTL_MINUTES')?:15)));
             $order=$this->orders->create([
@@ -191,6 +191,7 @@ final class RegistrationCheckoutService
             $order=$this->orders->updatePayment((string)$order['id'],$payment)??$order;
             if(($payment['status']??'')==='paid'){
                 $reserved=$this->tickets->commitReservation((string)$ticket['id'],(string)$event['id']);
+                $committed=true;
                 $schema=$this->registration->schema((string)$event['id']);
                 if(($schema['approval_mode']??'auto')!=='manual'){
                     $attendee=$this->attendees->update((string)$attendee['id'],['status'=>'Confirmed'])??$attendee;
@@ -199,6 +200,9 @@ final class RegistrationCheckoutService
         }catch(\Throwable $e){
             if($order!==null && $this->orders->find((string)$order['id'])!==null){
                 $this->orders->delete((string)$order['id']);
+            }
+            if($committed)$this->tickets->releaseSold((string)$ticket['id'],(string)$event['id']);
+            else{
                 $current=$this->tickets->find((string)$ticket['id']);
                 if((int)($current['reserved']??0)>0)$this->tickets->releaseReservation((string)$ticket['id'],(string)$event['id']);
             }
