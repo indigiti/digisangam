@@ -48,6 +48,7 @@ export const api={
   publicRegister:(id,payload)=>publicRequest('/public/events/'+encodeURIComponent(id)+'/register',{method:'POST',body:JSON.stringify(payload)}),
   publicVerifyRazorpay:(payload)=>publicRequest('/public/payments/razorpay/verify',{method:'POST',body:JSON.stringify(payload)}),
   publicConfirmation:(token)=>publicRequest('/public/confirmations/'+encodeURIComponent(token)),
+  retryPublicPayment:(token)=>publicRequest('/public/confirmations/'+encodeURIComponent(token)+'/retry-payment',{method:'POST',body:'{}'}),
   publicConcierge:(token,question)=>publicRequest('/public/concierge/'+encodeURIComponent(token),{method:'POST',body:JSON.stringify({question})}),
   dashboard:(eventId='')=>request('/dashboard'+(eventId?'?event_id='+encodeURIComponent(eventId):'')),
   intelligenceOverview:(eventId)=>request('/intelligence/overview?event_id='+encodeURIComponent(eventId)),
