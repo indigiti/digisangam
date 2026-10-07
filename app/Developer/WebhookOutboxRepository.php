@@ -21,7 +21,12 @@ final class WebhookOutboxRepository
 
     public function pending(int $limit=25): array
     {
-        return array_slice(array_values(array_filter($this->all(),fn($x)=>in_array(($x['status']??''),['queued','retry'],true))),0,max(1,$limit));
+        $now=time();
+        return array_slice(array_values(array_filter($this->all(),static function(array $row) use ($now): bool {
+            if(!in_array(($row['status']??''),['queued','retry'],true)) return false;
+            $next=(string)($row['next_attempt_at']??'');
+            return $next==='' || (strtotime($next)?:0)<=$now;
+        })),0,max(1,$limit));
     }
 
     public function mark(string $id,string $status,array $meta=[]): void
