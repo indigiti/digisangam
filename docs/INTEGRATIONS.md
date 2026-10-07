@@ -162,5 +162,7 @@ A production deployment should schedule:
 - `scripts/notifications.php`
 - `scripts/webhooks.php`
 - `scripts/badge-print.php`
+- `scripts/order-expiry.php`
+- `scripts/media-cleanup.php`
 
-The DigiOps release verifier checks that all three workers are present in the private release payload.
+Run notifications, webhooks, badge printing and order expiry about every five minutes; run media cleanup about hourly. The DigiOps release verifier checks that all five workers are present in the private release payload.
