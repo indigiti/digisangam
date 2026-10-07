@@ -19,20 +19,21 @@ final class VenueRepository
     {
         $eventId=trim($eventId);
         if($eventId==='') throw new \InvalidArgumentException('Event is required.');
-        $current=$this->get($eventId);
-        foreach(['name','address'] as $field) if(array_key_exists($field,$input)) $current[$field]=trim((string)$input[$field]);
-        if(isset($input['zones'])){
-            if(!is_array($input['zones'])) throw new \InvalidArgumentException('Venue zones must be an array.');
-            $current['zones']=$this->validateZones($input['zones']);
-        }
-        if(isset($input['seating'])){
-            if(!is_array($input['seating'])) throw new \InvalidArgumentException('Venue seating must be an array.');
-            $current['seating']=$this->validateSeating($input['seating']);
-        }
-        $current['event_id']=$eventId;
-        $current['updated_at']=date(DATE_ATOM);
-        $this->store->write('venue/'.$eventId.'.json',$current);
-        return $current;
+        return $this->store->transaction('venue/'.$eventId.'.json',function(array $current) use ($eventId,$input): array {
+            $current=array_merge(self::defaults($eventId),$current);
+            foreach(['name','address'] as $field) if(array_key_exists($field,$input)) $current[$field]=trim((string)$input[$field]);
+            if(isset($input['zones'])){
+                if(!is_array($input['zones'])) throw new \InvalidArgumentException('Venue zones must be an array.');
+                $current['zones']=$this->validateZones($input['zones']);
+            }
+            if(isset($input['seating'])){
+                if(!is_array($input['seating'])) throw new \InvalidArgumentException('Venue seating must be an array.');
+                $current['seating']=$this->validateSeating($input['seating']);
+            }
+            $current['event_id']=$eventId;
+            $current['updated_at']=date(DATE_ATOM);
+            return ['data'=>$current,'result'=>$current];
+        },self::defaults($eventId));
     }
 
     private function validateZones(array $zones): array
