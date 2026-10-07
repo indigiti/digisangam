@@ -27,6 +27,7 @@ use DigiSangam\Automation\WorkflowRepository;
 use DigiSangam\Badges\BadgeTemplateRepository;
 use DigiSangam\Badges\PrintJobRepository;
 use DigiSangam\Commerce\OrderRepository;
+use DigiSangam\Commerce\OrderExpiryService;
 use DigiSangam\Communications\CampaignDispatchService;
 use DigiSangam\Communications\CampaignRepository;
 use DigiSangam\Core\Storage\JsonFileStore;
@@ -160,9 +161,20 @@ try{
     $ticket=$tickets->create(['event_id'=>$eventId,'name'=>'General Admission','price'=>2500,'quantity'=>50,'status'=>'Active']);
     expect(($ticket['event_id']??'')===$eventId,'Ticket was not event-scoped.');
     $reserved=$tickets->reserveOne($ticket['id'],$eventId);
-    expect((int)$reserved['sold']===1,'Ticket reservation failed.');
-    $tickets->releaseOne($ticket['id'],$eventId);
-    expect((int)$tickets->find($ticket['id'])['sold']===0,'Ticket release failed.');
+    expect((int)$reserved['reserved']===1 && (int)$reserved['sold']===0,'Ticket reservation failed.');
+    $committedTicket=$tickets->commitReservation($ticket['id'],$eventId);
+    expect((int)$committedTicket['reserved']===0 && (int)$committedTicket['sold']===1,'Ticket reservation commit failed.');
+    $tickets->releaseSold($ticket['id'],$eventId);
+    expect((int)$tickets->find($ticket['id'])['sold']===0,'Sold ticket release failed.');
+
+    $expiryHold=$tickets->reserveOne($ticket['id'],$eventId);
+    $expiryOrder=(new OrderRepository($store))->create([
+        'event_id'=>$eventId,'attendee_id'=>'','ticket_id'=>$ticket['id'],'amount'=>2500,'currency'=>'INR',
+        'status'=>'pending','reservation_expires_at'=>date(DATE_ATOM,time()-60),
+    ]);
+    $expiryResult=(new OrderExpiryService(new OrderRepository($store),$tickets,new AttendeeRepository($store),new EventJournal($store)))->run();
+    expect(($expiryResult['expired']??0)===1,'Expired payment reservation was not processed.');
+    expect((int)$tickets->find($ticket['id'])['reserved']===0,'Expired payment reservation did not release inventory.');
 
     $attendees=new AttendeeRepository($store);
     $vip=$attendees->create([
