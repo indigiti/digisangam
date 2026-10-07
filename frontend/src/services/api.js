@@ -74,6 +74,8 @@ export const api={
   credential:(id)=>request('/attendees/'+encodeURIComponent(id)+'/credential'),
   scannerVerify:(payload,zone_id='')=>request('/scanner/verify',{method:'POST',body:JSON.stringify({payload,zone_id})}),
   scannerCheckin:(payload,zone_id='')=>request('/scanner/checkin',{method:'POST',body:JSON.stringify({payload,zone_id})}),
+  scannerExit:(payload,zone_id='')=>request('/scanner/exit',{method:'POST',body:JSON.stringify({payload,zone_id})}),
+  ongroundLive:(eventId,limit=100)=>request('/onground/live?event_id='+encodeURIComponent(eventId)+'&limit='+encodeURIComponent(limit)),
   ongroundSnapshot:(eventId)=>request('/onground/snapshot/'+encodeURIComponent(eventId)),
   ongroundSync:(items)=>request('/onground/sync',{method:'POST',body:JSON.stringify({items})}),
   campaigns:(eventId='')=>request('/campaigns'+(eventId?'?event_id='+encodeURIComponent(eventId):'')),
