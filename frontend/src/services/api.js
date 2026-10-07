@@ -151,6 +151,7 @@ export const api={
   developerWebhookDeliveries:(eventId)=>request('/developer/webhook-deliveries?event_id='+encodeURIComponent(eventId)),
   createDeveloperWebhook:(payload)=>request('/developer/webhooks',{method:'POST',body:JSON.stringify(payload)}),
   updateDeveloperWebhook:(id,payload)=>request('/developer/webhooks/'+encodeURIComponent(id),{method:'PATCH',body:JSON.stringify(payload)}),
+  operationsHealth:()=>request('/operations/health'),
   workspace:()=>request('/workspace'),
   updateWorkspace:(payload)=>request('/workspace',{method:'PATCH',body:JSON.stringify(payload)}),
   team:()=>request('/team'),
