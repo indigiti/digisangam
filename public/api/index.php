@@ -30,6 +30,7 @@ use DigiSangam\Core\EventJournal\EventJournal;
 use DigiSangam\Core\Http\JsonResponse;
 use DigiSangam\Core\Storage\JsonFileStore;
 use DigiSangam\Credentials\CredentialService;
+use DigiSangam\Credentials\CredentialSecret;
 use DigiSangam\Events\EventRepository;
 use DigiSangam\Invitations\InvitationRepository;
 use DigiSangam\Intelligence\EventGraphBuilder;
@@ -141,15 +142,7 @@ $assertPublishable=static function(array $candidate) use ($store): void {
     if($errors!==[]) throw new InvalidArgumentException('Event cannot be published until configured: '.implode(', ',$errors).'.');
 };
 
-$credentialSecret = static function () use ($store): string {
-    $env = trim((string)getenv('DIGISANGAM_CREDENTIAL_SECRET'));
-    if ($env !== '') return $env;
-    $record = $store->read('secrets/credential.json', []);
-    if (!empty($record['secret'])) return (string)$record['secret'];
-    $secret = bin2hex(random_bytes(32));
-    $store->write('secrets/credential.json', ['secret'=>$secret,'created_at'=>date(DATE_ATOM)]);
-    return $secret;
-};
+$credentialSecret = static fn(): string => CredentialSecret::resolve($store);
 
 $publicFlow = static function () use ($store,$credentialSecret): RegistrationCheckoutService {
     return new RegistrationCheckoutService(
