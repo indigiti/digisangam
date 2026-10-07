@@ -18,7 +18,7 @@ const form=reactive({
     {id:'fld_company',label:'Company Name',type:'text',required:false,visibility:'always'},
   ]},
   ticket:{enabled:true,name:'General Admission',price:0,quantity:500,sale_start:'',sale_end:''},
-  branding:{brand_name:'',logo_url:'',cover_url:'',primary_color:'#4f46e5',secondary_color:'#06b6d4',background_color:'#0f172a'},
+  branding:{brand_name:'',logo_url:'',poster_url:'',cover_url:'',primary_color:'#4f46e5',secondary_color:'#06b6d4',background_color:'#0f172a'},
   organizer:{name:'',email:'',phone:''},
   public_page:{headline:'',show_location:true,show_organizer:true},
 })
@@ -101,7 +101,8 @@ async function create(){
     <label class="field"><span>Brand name</span><input v-model="form.branding.brand_name" :placeholder="form.name"/></label>
     <label class="field"><span>Organizer name</span><input v-model="form.organizer.name"/></label>
     <label class="field md:col-span-2"><span>Logo URL</span><input v-model="form.branding.logo_url" placeholder="https://…"/></label>
-    <label class="field md:col-span-2"><span>Cover image URL</span><input v-model="form.branding.cover_url" placeholder="https://…"/></label>
+    <label class="field"><span>Event poster URL (2:3)</span><input v-model="form.branding.poster_url" placeholder="Portrait artwork"/></label>
+    <label class="field"><span>Hero banner URL (16:9)</span><input v-model="form.branding.cover_url" placeholder="Wide event artwork"/></label>
     <label class="field"><span>Primary colour</span><input v-model="form.branding.primary_color" type="color" class="h-11"/></label>
     <label class="field"><span>Secondary colour</span><input v-model="form.branding.secondary_color" type="color" class="h-11"/></label>
     <label class="field"><span>Organizer email</span><input v-model="form.organizer.email" type="email"/></label>
