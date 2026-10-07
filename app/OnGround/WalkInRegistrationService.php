@@ -40,6 +40,7 @@ final class WalkInRegistrationService
         $settled=(bool)($input['payment_settled']??($amount===0));
         $status=$settled?'Confirmed':'Pending';
 
+        $attendee=null;
         try{
             $attendee=$this->attendees->create([
                 'event_id'=>$eventId,'name'=>$name,'email'=>$email,'phone'=>$phone,
@@ -53,12 +54,16 @@ final class WalkInRegistrationService
                     'amount'=>$amount,'currency'=>$event['currency']??'INR',
                     'status'=>$settled?'paid':'pending','provider'=>'manual',
                     'payment_reference'=>trim((string)($input['payment_reference']??'')),
+                    'reservation_expires_at'=>!$settled&&$amount>0
+                        ? date(DATE_ATOM,time()+(max(5,min(120,(int)(getenv('DIGISANGAM_RESERVATION_TTL_MINUTES')?:15)))*60))
+                        : '',
                 ]);
             }
             if($ticket&&$settled)$ticket=$this->tickets->commitReservation($ticketId,$eventId);
             $credential=$status==='Confirmed'?$this->credentials->issue((string)$attendee['id'],$eventId):null;
             return ['attendee'=>$attendee,'ticket'=>$ticket,'order'=>$order,'credential'=>$credential];
         }catch(\Throwable $e){
+            if($attendee!==null) $this->attendees->delete((string)$attendee['id']);
             if($ticket) $this->tickets->releaseReservation($ticketId,$eventId);
             throw $e;
         }
