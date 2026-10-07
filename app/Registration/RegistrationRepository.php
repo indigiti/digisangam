@@ -7,7 +7,7 @@ use DigiSangam\Core\Storage\JsonFileStore;
 
 final class RegistrationRepository
 {
-    private const TYPES=['text','email','phone','select','dropdown','multiselect','radio','date','paragraph','textarea'];
+    private const TYPES=['text','email','phone','select','dropdown','multiselect','radio','date','file','paragraph','textarea'];
     private const APPROVAL_MODES=['auto','manual','invite_only'];
     private const OPERATORS=['equals','not_equals','contains'];
 
