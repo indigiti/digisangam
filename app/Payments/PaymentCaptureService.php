@@ -8,6 +8,7 @@ use DigiSangam\Commerce\OrderRepository;
 use DigiSangam\Core\EventJournal\EventJournal;
 use DigiSangam\Notifications\NotificationOutbox;
 use DigiSangam\Registration\RegistrationRepository;
+use DigiSangam\Tickets\TicketRepository;
 
 final class PaymentCaptureService
 {
@@ -17,6 +18,7 @@ final class PaymentCaptureService
         private readonly RegistrationRepository $registration,
         private readonly NotificationOutbox $notifications,
         private readonly EventJournal $journal,
+        private readonly TicketRepository $tickets,
     ) {}
 
     public function capture(string $orderId,string $provider,string $paymentReference): array
@@ -25,9 +27,19 @@ final class PaymentCaptureService
         if(!$order) throw new \RuntimeException('Order not found.');
         if(($order['status']??'')==='paid') return ['order'=>$order,'attendee'=>$this->attendees->find((string)$order['attendee_id']),'duplicate'=>true];
 
-        $order=$this->orders->updatePayment($orderId,[
-            'status'=>'paid','provider'=>$provider,'payment_reference'=>$paymentReference,
-        ]) ?? $order;
+        $committed=false;
+        if(!empty($order['ticket_id'])){
+            $this->tickets->commitReservation((string)$order['ticket_id'],(string)$order['event_id']);
+            $committed=true;
+        }
+        try{
+            $order=$this->orders->updatePayment($orderId,[
+                'status'=>'paid','provider'=>$provider,'payment_reference'=>$paymentReference,'reservation_expires_at'=>'',
+            ]) ?? $order;
+        }catch(\Throwable $e){
+            if($committed)$this->tickets->releaseSold((string)$order['ticket_id'],(string)$order['event_id']);
+            throw $e;
+        }
 
         $attendee=$this->attendees->find((string)$order['attendee_id']);
         if($attendee){
