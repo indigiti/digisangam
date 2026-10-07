@@ -32,22 +32,32 @@ final class ExhibitorRepository
         if($record['event_id']==='') throw new \InvalidArgumentException('Event is required.');
         if($record['name']==='') throw new \InvalidArgumentException('Exhibitor name is required.');
         if($record['contact_email']!=='' && !filter_var($record['contact_email'],FILTER_VALIDATE_EMAIL)) throw new \InvalidArgumentException('Contact email is invalid.');
-        $rows=$this->all(); array_unshift($rows,$record);
-        $this->store->write('exhibitors/index.json',$rows);
-        return $record;
+        return $this->store->transaction('exhibitors/index.json',static function(array $rows) use ($record): array {
+            array_unshift($rows,$record);
+            return ['data'=>$rows,'result'=>$record];
+        },[]);
     }
 
     public function update(string $id,array $input): ?array
     {
-        $rows=$this->all(); $updated=null;
-        foreach($rows as &$row){
-            if(($row['id']??'')!==$id) continue;
-            foreach(['name','type','booth','contact_name','contact_email','staff_quota','lead_quota','status'] as $field) if(array_key_exists($field,$input)) $row[$field]=$input[$field];
-            $row['updated_at']=date(DATE_ATOM); $updated=$row; break;
-        }
-        unset($row);
-        if($updated!==null) $this->store->write('exhibitors/index.json',$rows);
-        return $updated;
+        return $this->store->transaction('exhibitors/index.json',static function(array $rows) use ($id,$input): array {
+            $updated=null;
+            foreach($rows as &$row){
+                if(($row['id']??'')!==$id) continue;
+                foreach(['name','type','booth','contact_name','contact_email','status'] as $field){
+                    if(array_key_exists($field,$input)) $row[$field]=trim((string)$input[$field]);
+                }
+                foreach(['staff_quota','lead_quota'] as $field){
+                    if(array_key_exists($field,$input)) $row[$field]=max(0,(int)$input[$field]);
+                }
+                if(trim((string)($row['name']??''))==='') throw new \InvalidArgumentException('Exhibitor name is required.');
+                $email=trim((string)($row['contact_email']??''));
+                if($email!==''&&!filter_var($email,FILTER_VALIDATE_EMAIL)) throw new \InvalidArgumentException('Contact email is invalid.');
+                $row['updated_at']=date(DATE_ATOM); $updated=$row; break;
+            }
+            unset($row);
+            return ['data'=>$rows,'result'=>$updated];
+        },[]);
     }
 
 }
