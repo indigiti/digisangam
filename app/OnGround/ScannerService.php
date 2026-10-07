@@ -22,19 +22,23 @@ final class ScannerService
 
     public function verify(string $payload,string $zoneId=''): array
     {
-        [$token,$source]=$this->resolveCredentialToken($payload);
-        if($token==='') return ['allowed'=>false,'reason'=>'INVALID_EXTERNAL_CREDENTIAL'];
-        $credential=$this->credentials->verify($token);
-        if(!$credential) return ['allowed'=>false,'reason'=>'INVALID_SIGNATURE'];
+        $resolved=$this->resolveIdentity($payload);
+        if(empty($resolved['allowed'])) return $resolved;
 
-        $attendee=$this->attendees->find((string)($credential['attendee_id']??''));
-        if(!$attendee) return ['allowed'=>false,'reason'=>'ATTENDEE_NOT_FOUND'];
-        if(($attendee['event_id']??'')!==($credential['event_id']??'')) return ['allowed'=>false,'reason'=>'EVENT_MISMATCH'];
-        if(($attendee['status']??'')!=='Confirmed') return ['allowed'=>false,'reason'=>'NOT_CONFIRMED','attendee'=>$this->publicAttendee($attendee)];
+        $attendee=$resolved['attendee_private'];
+        if(($attendee['status']??'')!=='Confirmed') return [
+            'allowed'=>false,'reason'=>'NOT_CONFIRMED',
+            'attendee'=>$this->publicAttendee($attendee),'event_id'=>$attendee['event_id']??'',
+            'credential_source'=>$resolved['credential_source'],
+        ];
 
         $order=$this->orders->findLatestByAttendee((string)$attendee['id']);
         if($order && (int)($order['amount']??0)>0 && ($order['status']??'')!=='paid'){
-            return ['allowed'=>false,'reason'=>'PAYMENT_NOT_PAID','attendee'=>$this->publicAttendee($attendee)];
+            return [
+                'allowed'=>false,'reason'=>'PAYMENT_NOT_PAID',
+                'attendee'=>$this->publicAttendee($attendee),'event_id'=>$attendee['event_id']??'',
+                'credential_source'=>$resolved['credential_source'],
+            ];
         }
 
         $zone=null;
@@ -42,7 +46,8 @@ final class ScannerService
             $zone=$this->accessPolicy->evaluate((string)$attendee['event_id'],(string)($attendee['category']??''),$zoneId);
             if(empty($zone['allowed'])) return [
                 'allowed'=>false,'reason'=>$zone['reason']??'ZONE_DENIED',
-                'attendee'=>$this->publicAttendee($attendee),'event_id'=>$attendee['event_id'],'zone'=>$zone['zone']??null,'credential_source'=>$source,
+                'attendee'=>$this->publicAttendee($attendee),'event_id'=>$attendee['event_id'],'zone'=>$zone['zone']??null,
+                'credential_source'=>$resolved['credential_source'],
             ];
         }
 
@@ -54,7 +59,7 @@ final class ScannerService
             'event_id'=>$attendee['event_id'],
             'zone'=>$zone['zone']??null,
             'checkin'=>$existing,
-            'credential_source'=>$source,
+            'credential_source'=>$resolved['credential_source'],
         ];
     }
 
@@ -64,11 +69,49 @@ final class ScannerService
         if(empty($verification['allowed'])) return $verification;
         $attendee=$verification['attendee'];
         $result=$this->checkins->checkin((string)$verification['event_id'],(string)$attendee['id'],$operatorId,$zoneId);
-        $access=null;
-        if($zoneId!=='' && $this->accessEvents){
-            $access=$this->accessEvents->enter((string)$verification['event_id'],(string)$attendee['id'],$zoneId,$operatorId);
-        }
+        $access=$this->accessEvents
+            ? $this->accessEvents->enter((string)$verification['event_id'],(string)$attendee['id'],$zoneId,$operatorId)
+            : null;
         return $verification + $result + ['access_event'=>$access];
+    }
+
+    public function exit(string $payload,string $operatorId='',string $zoneId=''): array
+    {
+        $resolved=$this->resolveIdentity($payload);
+        if(empty($resolved['allowed'])) return $resolved;
+        $attendee=$resolved['attendee_private'];
+        if(!$this->accessEvents) return ['allowed'=>false,'reason'=>'ACCESS_LEDGER_UNAVAILABLE'];
+
+        $result=$this->accessEvents->exit((string)$attendee['event_id'],(string)$attendee['id'],$zoneId,$operatorId);
+        return [
+            'allowed'=>true,
+            'reason'=>!empty($result['duplicate'])?'ALREADY_EXITED':'EXIT_RECORDED',
+            'attendee'=>$this->publicAttendee($attendee),
+            'event_id'=>$attendee['event_id'],
+            'credential_source'=>$resolved['credential_source'],
+            'already_exited'=>(bool)($result['duplicate']??false),
+            'access_event'=>$result,
+        ];
+    }
+
+    private function resolveIdentity(string $payload): array
+    {
+        [$token,$source]=$this->resolveCredentialToken($payload);
+        if($token==='') return ['allowed'=>false,'reason'=>'INVALID_EXTERNAL_CREDENTIAL','credential_source'=>$source];
+
+        $credential=$this->credentials->verify($token);
+        if(!$credential) return ['allowed'=>false,'reason'=>'INVALID_SIGNATURE','credential_source'=>$source];
+
+        $attendee=$this->attendees->find((string)($credential['attendee_id']??''));
+        if(!$attendee) return ['allowed'=>false,'reason'=>'ATTENDEE_NOT_FOUND','credential_source'=>$source];
+        if(($attendee['event_id']??'')!==($credential['event_id']??'')) return ['allowed'=>false,'reason'=>'EVENT_MISMATCH','credential_source'=>$source];
+
+        return [
+            'allowed'=>true,
+            'attendee_private'=>$attendee,
+            'event_id'=>$attendee['event_id'],
+            'credential_source'=>$source,
+        ];
     }
 
     private function resolveCredentialToken(string $payload): array
