@@ -66,6 +66,7 @@ export const api={
   saveRegistration:(eventId,payload)=>request('/events/'+encodeURIComponent(eventId)+'/registration',{method:'PUT',body:JSON.stringify(payload)}),
   invitations:(eventId='')=>request('/invitations'+(eventId?'?event_id='+encodeURIComponent(eventId):'')),
   createInvitation:(payload)=>request('/invitations',{method:'POST',body:JSON.stringify(payload)}),
+  sendInvitation:(id)=>request('/invitations/'+encodeURIComponent(id)+'/send',{method:'POST',body:'{}'}),
   revokeInvitation:(id)=>request('/invitations/'+encodeURIComponent(id)+'/revoke',{method:'POST',body:'{}'}),
   attendees:(eventId='')=>request('/attendees'+(eventId?'?event_id='+encodeURIComponent(eventId):'')),
   attendee:(id)=>request('/attendees/'+encodeURIComponent(id)),
