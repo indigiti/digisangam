@@ -8,6 +8,7 @@ use DigiSangam\Commerce\OrderRepository;
 use DigiSangam\Core\EventJournal\EventJournal;
 use DigiSangam\Notifications\NotificationOutbox;
 use DigiSangam\Registration\RegistrationRepository;
+use DigiSangam\Tickets\TicketRepository;
 
 final class PaymentWebhookService
 {
@@ -17,6 +18,7 @@ final class PaymentWebhookService
         private readonly RegistrationRepository $registration,
         private readonly NotificationOutbox $notifications,
         private readonly EventJournal $journal,
+        private readonly TicketRepository $tickets,
     ) {}
 
     public function handleRazorpay(array $payload): array
@@ -43,17 +45,24 @@ final class PaymentWebhookService
                 $this->registration,
                 $this->notifications,
                 $this->journal,
+                $this->tickets,
             ))->capture($internalOrderId,'razorpay',$providerPaymentId);
             return ['ok'=>true]+$capture;
         }
 
         if ($event === 'payment.failed') {
             if (($order['status'] ?? '') === 'paid') return ['ok'=>true,'ignored'=>true,'reason'=>'ALREADY_PAID'];
-            $order = $this->orders->updatePayment($internalOrderId,[
-                'status'=>'failed',
+            $transition=$this->orders->transitionStatus($internalOrderId,['pending'],'failed',[
                 'provider'=>'razorpay',
                 'payment_reference'=>(string)($paymentEntity['id'] ?? ''),
-            ]) ?? $order;
+                'reservation_expires_at'=>'',
+            ]);
+            if($transition){
+                $order=$transition;
+                if(!empty($order['ticket_id'])) $this->tickets->releaseReservation((string)$order['ticket_id'],(string)$order['event_id']);
+            }else{
+                $order=$this->orders->find($internalOrderId)??$order;
+            }
             $this->journal->append('payment.failed',['order_id'=>$order['id'],'provider'=>'razorpay']);
             return ['ok'=>true,'order'=>$order];
         }
