@@ -17,7 +17,7 @@ router.beforeEach(async(to)=>{
     if(to.path==='/access'&&auth.user) return '/'
     return true
   }
-  if(!auth.user) return '/access'
+  if(!auth.user) return to.path==='/'?'/discover':'/access'
   return true
 })
 
