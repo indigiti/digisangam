@@ -1,7 +1,7 @@
 const CACHE='digisangam-shell-v3'
 const scopePath=new URL(self.registration.scope).pathname.replace(/\/$/,'')
 const appPath=path=>scopePath+(path.startsWith('/')?path:'/'+path)
-const SHELL=[appPath('/'),appPath('/onground'),appPath('/manifest.webmanifest')]
+const SHELL=[appPath('/'),appPath('/discover'),appPath('/onground'),appPath('/manifest.webmanifest')]
 
 self.addEventListener('install',event=>{
   event.waitUntil(caches.open(CACHE).then(cache=>cache.addAll(SHELL)).catch(()=>{}))
