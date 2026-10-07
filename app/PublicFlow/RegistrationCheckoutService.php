@@ -157,6 +157,64 @@ final class RegistrationCheckoutService
         ];
     }
 
+    public function retryPayment(string $token): array
+    {
+        if(strlen($token)<32) throw new \InvalidArgumentException('Invalid confirmation token.');
+        $attendee=$this->attendees->findByConfirmationToken($token);
+        if(!$attendee) throw new \RuntimeException('Confirmation not found.');
+
+        $previous=$this->orders->findLatestByAttendee((string)$attendee['id']);
+        if(!$previous || !in_array((string)($previous['status']??''),['expired','failed'],true)){
+            throw new \RuntimeException('This payment is not eligible for retry.');
+        }
+
+        $event=$this->events->find((string)$attendee['event_id']);
+        $ticket=$this->tickets->find((string)($attendee['ticket_id']??''));
+        if(!$event||!$ticket) throw new \RuntimeException('Event or ticket is no longer available.');
+
+        $reserved=$this->tickets->reserveOne((string)$ticket['id'],(string)$event['id']);
+        $order=null;
+        try{
+            $ttl=max(5,min(120,(int)(getenv('DIGISANGAM_RESERVATION_TTL_MINUTES')?:15)));
+            $order=$this->orders->create([
+                'event_id'=>$event['id'],'attendee_id'=>$attendee['id'],'ticket_id'=>$ticket['id'],
+                'amount'=>(int)($reserved['price']??0),'currency'=>strtoupper((string)($event['currency']??'INR')),
+                'status'=>(int)($reserved['price']??0)>0?'pending':'paid',
+                'reservation_expires_at'=>(int)($reserved['price']??0)>0?date(DATE_ATOM,time()+($ttl*60)):'',
+            ]);
+            $payment=$this->payments->create($order,['attendee'=>$attendee,'event'=>$event,'ticket'=>$reserved]);
+            if(($payment['action']??'')==='pending_external_provider'){
+                $this->orders->delete((string)$order['id']);
+                $this->tickets->releaseReservation((string)$ticket['id'],(string)$event['id']);
+                throw new \RuntimeException('Online payment provider is not configured. Please contact the organizer.');
+            }
+            $order=$this->orders->updatePayment((string)$order['id'],$payment)??$order;
+            if(($payment['status']??'')==='paid'){
+                $reserved=$this->tickets->commitReservation((string)$ticket['id'],(string)$event['id']);
+                $schema=$this->registration->schema((string)$event['id']);
+                if(($schema['approval_mode']??'auto')!=='manual'){
+                    $attendee=$this->attendees->update((string)$attendee['id'],['status'=>'Confirmed'])??$attendee;
+                }
+            }
+        }catch(\Throwable $e){
+            if($order!==null && $this->orders->find((string)$order['id'])!==null){
+                $this->orders->delete((string)$order['id']);
+                $current=$this->tickets->find((string)$ticket['id']);
+                if((int)($current['reserved']??0)>0)$this->tickets->releaseReservation((string)$ticket['id'],(string)$event['id']);
+            }
+            throw $e;
+        }
+
+        $credential=(($attendee['status']??'')==='Confirmed'&&($order['status']??'')==='paid')
+            ?$this->credentials->issue((string)$attendee['id'],(string)$event['id'])
+            :null;
+
+        return [
+            'attendee'=>$this->publicAttendee($attendee),'event'=>$event,'ticket'=>$reserved,
+            'order'=>$order,'payment'=>$payment,'credential'=>$credential,'confirmation_token'=>$token,
+        ];
+    }
+
     public function confirmation(string $token): array
     {
         if (strlen($token) < 32) throw new \InvalidArgumentException('Invalid confirmation token.');
