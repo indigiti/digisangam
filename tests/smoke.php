@@ -393,7 +393,7 @@ try{
 
     // Badge printer worker reaches a real provider abstraction; log provider is truthfully simulated.
     $print2=(new PrintJobRepository($store))->create(['event_id'=>$eventId,'attendee_id'=>$vip['id'],'template_id'=>$badge['id']]);
-    $printRun=(new BadgePrintWorker(new PrintJobRepository($store),$attendees,$badgeRepo,new LogPrintProvider()))->run(10);
+    $printRun=(new BadgePrintWorker(new PrintJobRepository($store),$attendees,$badgeRepo,new LogPrintProvider(),new CredentialService('smoke-secret')))->run(10);
     expect(($printRun['simulated']??0)>=1,'Badge print provider abstraction failed.');
 
     // SMS uses the same retryable notification worker and is not falsely marked delivered with log provider.
