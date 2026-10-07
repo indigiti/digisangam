@@ -44,6 +44,7 @@ use DigiSangam\Payments\RazorpayCheckoutVerifier;
 use DigiSangam\Payments\RazorpayWebhookVerifier;
 use DigiSangam\Documents\ReceiptService;
 use DigiSangam\OnGround\ScannerService;
+use DigiSangam\OnGround\ScanAttemptRepository;
 use DigiSangam\OnGround\CheckinRepository;
 use DigiSangam\PublicFlow\PublicRequestGuard;
 use DigiSangam\PublicFlow\RateLimitException;
@@ -425,15 +426,28 @@ try {
     if (!in_array($method, ['GET','HEAD'], true)) $auth->validateCsrf();
 
     if ($method === 'POST' && $path === '/scanner/verify') {
-        $auth->requirePermission('attendees.checkin');
+        $user=$auth->requirePermission('attendees.checkin');
         $input=$body();
-        JsonResponse::send($scanner()->verify((string)($input['payload'] ?? ''),(string)($input['zone_id'] ?? '')));
+        $result=$scanner()->verify((string)($input['payload'] ?? ''),(string)($input['zone_id'] ?? ''));
+        $attemptEvent=(string)($result['event_id']??$input['event_id']??'');
+        if($attemptEvent!=='') (new ScanAttemptRepository($store))->record([
+            'event_id'=>$attemptEvent,'attendee_id'=>$result['attendee']['id']??'','operator_id'=>$user['id'],
+            'zone_id'=>$input['zone_id']??'','operation'=>'verify','allowed'=>!empty($result['allowed']),
+            'reason'=>$result['reason']??'UNKNOWN','credential_source'=>$result['credential_source']??'',
+        ]);
+        JsonResponse::send($result);
     }
 
     if ($method === 'POST' && $path === '/scanner/exit') {
         $user=$auth->requirePermission('attendees.checkin');
         $input=$body();
         $result=$scanner()->exit((string)($input['payload']??''),(string)$user['id'],(string)($input['zone_id']??''));
+        $attemptEvent=(string)($result['event_id']??$input['event_id']??'');
+        if($attemptEvent!=='') (new ScanAttemptRepository($store))->record([
+            'event_id'=>$attemptEvent,'attendee_id'=>$result['attendee']['id']??'','operator_id'=>$user['id'],
+            'zone_id'=>$input['zone_id']??'','operation'=>'exit','allowed'=>!empty($result['allowed']),
+            'reason'=>$result['reason']??'UNKNOWN','credential_source'=>$result['credential_source']??'',
+        ]);
         if(!empty($result['allowed']) && empty($result['already_exited'])){
             $journal->append('attendee.exited',[
                 'attendee_id'=>$result['attendee']['id']??null,
@@ -451,6 +465,12 @@ try {
         $user=$auth->requirePermission('attendees.checkin');
         $input=$body();
         $result=$scanner()->checkin((string)($input['payload'] ?? ''),(string)$user['id'],(string)($input['zone_id'] ?? ''));
+        $attemptEvent=(string)($result['event_id']??$input['event_id']??'');
+        if($attemptEvent!=='') (new ScanAttemptRepository($store))->record([
+            'event_id'=>$attemptEvent,'attendee_id'=>$result['attendee']['id']??'','operator_id'=>$user['id'],
+            'zone_id'=>$input['zone_id']??'','operation'=>'checkin','allowed'=>!empty($result['allowed']),
+            'reason'=>$result['reason']??'UNKNOWN','credential_source'=>$result['credential_source']??'',
+        ]);
         if(!empty($result['allowed'])){
             $journal->append('attendee.checked_in',[
                 'attendee_id'=>$result['attendee']['id'] ?? null,
@@ -1279,13 +1299,23 @@ try {
             ];
         };
         $recent=array_map($decorate,$access->recent($eventId,(int)($_GET['limit']??100)));
+        $denied=array_map(static function(array $row) use ($decorate): array {
+            $decorated=$decorate($row);
+            $decorated['action']='denied';
+            return $decorated;
+        },(new ScanAttemptRepository($store))->recentDenied($eventId,(int)($_GET['limit']??100)));
+        $activity=array_merge($recent,$denied);
+        usort($activity,static fn(array $a,array $b): int => strcmp((string)($b['occurred_at']??$b['entered_at']??$b['exited_at']??''),(string)($a['occurred_at']??$a['entered_at']??$a['exited_at']??'')));
+        $activity=array_slice($activity,0,max(1,min(500,(int)($_GET['limit']??100))));
         $inside=array_map($decorate,$access->currentlyInside($eventId));
         JsonResponse::send([
             'event_id'=>$eventId,
             'currently_inside'=>count($inside),
             'occupancy'=>$access->currentOccupancy($eventId),
             'inside'=>$inside,
-            'recent'=>$recent,
+            'recent'=>$activity,
+            'denied_count'=>count($denied),
+            'venue'=>(new VenueRepository($store))->get($eventId),
             'generated_at'=>date(DATE_ATOM),
         ]);
     }
