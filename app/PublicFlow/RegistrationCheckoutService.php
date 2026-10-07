@@ -157,7 +157,7 @@ final class RegistrationCheckoutService
         $event = $this->events->find((string)$attendee['event_id']);
         $ticket = $this->tickets->find((string)($attendee['ticket_id'] ?? ''));
         $order = $this->orders->findLatestByAttendee((string)$attendee['id']);
-        $credential = ($attendee['status'] ?? '') === 'Confirmed' && (($order['status'] ?? 'paid') === 'paid')
+        $credential = ($attendee['status'] ?? '') === 'Confirmed' && $order !== null && (($order['status'] ?? '') === 'paid')
             ? $this->credentials->issue((string)$attendee['id'], (string)$attendee['event_id'])
             : null;
         return [
