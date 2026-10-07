@@ -6,6 +6,7 @@ use DigiSangam\Commerce\OrderExpiryService;
 use DigiSangam\Commerce\OrderRepository;
 use DigiSangam\Core\EventJournal\EventJournal;
 use DigiSangam\Core\Storage\JsonFileStore;
+use DigiSangam\Operations\WorkerHeartbeatRepository;
 use DigiSangam\Tickets\TicketRepository;
 
 require dirname(__DIR__).'/app/bootstrap.php';
@@ -18,5 +19,6 @@ $result=(new OrderExpiryService(
     new EventJournal($store),
 ))->run((int)($argv[1]??100));
 
+(new WorkerHeartbeatRepository($store))->beat('order-expiry',$result,300);
 fwrite(STDOUT,json_encode($result,JSON_PRETTY_PRINT|JSON_UNESCAPED_SLASHES).PHP_EOL);
 exit(0);
