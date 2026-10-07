@@ -147,6 +147,7 @@ export const api={
   createDeveloperKey:(payload)=>request('/developer/keys',{method:'POST',body:JSON.stringify(payload)}),
   revokeDeveloperKey:(id)=>request('/developer/keys/'+encodeURIComponent(id)+'/revoke',{method:'POST',body:'{}'}),
   developerWebhooks:(eventId)=>request('/developer/webhooks?event_id='+encodeURIComponent(eventId)),
+  developerWebhookDeliveries:(eventId)=>request('/developer/webhook-deliveries?event_id='+encodeURIComponent(eventId)),
   createDeveloperWebhook:(payload)=>request('/developer/webhooks',{method:'POST',body:JSON.stringify(payload)}),
   updateDeveloperWebhook:(id,payload)=>request('/developer/webhooks/'+encodeURIComponent(id),{method:'PATCH',body:JSON.stringify(payload)}),
   workspace:()=>request('/workspace'),
