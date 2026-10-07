@@ -142,6 +142,7 @@ export const api={
   mediaUrl:(id)=>apiBase+'/media/'+encodeURIComponent(id),
   issueWallet:(token,platform)=>publicRequest('/public/confirmations/'+encodeURIComponent(token)+'/wallet',{method:'POST',body:JSON.stringify({platform})}),
   walletPasses:(eventId)=>request('/wallet-passes?event_id='+encodeURIComponent(eventId)),
+  createWalletPass:(payload)=>request('/wallet-passes',{method:'POST',body:JSON.stringify(payload)}),
   credentialBindings:(eventId)=>request('/credential-bindings?event_id='+encodeURIComponent(eventId)),
   bindCredential:(payload)=>request('/credential-bindings',{method:'POST',body:JSON.stringify(payload)}),
   revokeCredentialBinding:(id)=>request('/credential-bindings/'+encodeURIComponent(id)+'/revoke',{method:'POST',body:'{}'}),
