@@ -32,6 +32,7 @@ use DigiSangam\Communications\CampaignDispatchService;
 use DigiSangam\Communications\CampaignRepository;
 use DigiSangam\Core\Storage\JsonFileStore;
 use DigiSangam\Credentials\CredentialService;
+use DigiSangam\Credentials\CredentialSecret;
 use DigiSangam\Events\EventRepository;
 use DigiSangam\Exhibitors\ExhibitorRepository;
 use DigiSangam\Exhibitors\LeadRepository;
@@ -93,6 +94,11 @@ try{
         return ['data'=>['value'=>$next],'result'=>$next];
     },[]);
     expect($value===1 && ($store->read('counter.json')['value']??0)===1,'JSON transaction failed.');
+
+    // Credential signing secret must be stable across independent callers.
+    $secretA=CredentialSecret::resolve($store);
+    $secretB=CredentialSecret::resolve($store);
+    expect($secretA!=='' && hash_equals($secretA,$secretB),'Credential secret resolver is not stable.');
 
     // Build a real event from zero state.
     $events=new EventRepository($store);
