@@ -38,35 +38,50 @@ final class RegistrationRepository
         $eventId=trim($eventId);
         if($eventId==='') throw new \InvalidArgumentException('Event is required.');
 
-        $schema=$this->schema($eventId);
-        foreach(['title','approval_mode','categories','fields'] as $key){
-            if(array_key_exists($key,$input)) $schema[$key]=$input[$key];
-        }
+        $defaults=[
+            'event_id'=>$eventId,
+            'title'=>'Event Registration',
+            'approval_mode'=>'auto',
+            'categories'=>['General'],
+            'fields'=>[
+                ['id'=>'fld_name','label'=>'Full Name','type'=>'text','required'=>true,'visibility'=>'always'],
+                ['id'=>'fld_email','label'=>'Email Address','type'=>'email','required'=>true,'visibility'=>'always'],
+                ['id'=>'fld_phone','label'=>'Mobile Number','type'=>'phone','required'=>false,'visibility'=>'always'],
+                ['id'=>'fld_category','label'=>'Category','type'=>'select','required'=>true,'visibility'=>'always'],
+                ['id'=>'fld_company','label'=>'Company Name','type'=>'text','required'=>false,'visibility'=>'always'],
+            ],
+        ];
 
-        $schema['title']=trim((string)($schema['title']??''));
-        if($schema['title']==='') throw new \InvalidArgumentException('Registration title is required.');
+        return $this->store->transaction('registration/'.$eventId.'.json',function(array $schema) use ($eventId,$input,$defaults): array {
+            $schema=array_merge($defaults,$schema);
+            foreach(['title','approval_mode','categories','fields'] as $key){
+                if(array_key_exists($key,$input)) $schema[$key]=$input[$key];
+            }
 
-        $schema['approval_mode']=(string)($schema['approval_mode']??'auto');
-        if(!in_array($schema['approval_mode'],self::APPROVAL_MODES,true)) throw new \InvalidArgumentException('Invalid approval mode.');
+            $schema['title']=trim((string)($schema['title']??''));
+            if($schema['title']==='') throw new \InvalidArgumentException('Registration title is required.');
 
-        $categories=[];
-        foreach((array)($schema['categories']??[]) as $category){
-            $value=trim((string)$category);
-            if($value!==''&&!in_array($value,$categories,true)) $categories[]=$value;
-        }
-        if($categories===[]) throw new \InvalidArgumentException('At least one attendee category is required.');
-        $schema['categories']=$categories;
+            $schema['approval_mode']=(string)($schema['approval_mode']??'auto');
+            if(!in_array($schema['approval_mode'],self::APPROVAL_MODES,true)) throw new \InvalidArgumentException('Invalid approval mode.');
 
-        $fields=$this->validateFields((array)($schema['fields']??[]));
-        $ids=array_column($fields,'id');
-        foreach(['fld_name','fld_email','fld_category'] as $requiredId){
-            if(!in_array($requiredId,$ids,true)) throw new \InvalidArgumentException('Required system field '.$requiredId.' is missing.');
-        }
-        $schema['fields']=$fields;
-        $schema['event_id']=$eventId;
-        $schema['updated_at']=date(DATE_ATOM);
-        $this->store->write('registration/'.$eventId.'.json',$schema);
-        return $schema;
+            $categories=[];
+            foreach((array)($schema['categories']??[]) as $category){
+                $value=trim((string)$category);
+                if($value!==''&&!in_array($value,$categories,true)) $categories[]=$value;
+            }
+            if($categories===[]) throw new \InvalidArgumentException('At least one attendee category is required.');
+            $schema['categories']=$categories;
+
+            $fields=$this->validateFields((array)($schema['fields']??[]));
+            $ids=array_column($fields,'id');
+            foreach(['fld_name','fld_email','fld_category'] as $requiredId){
+                if(!in_array($requiredId,$ids,true)) throw new \InvalidArgumentException('Required system field '.$requiredId.' is missing.');
+            }
+            $schema['fields']=$fields;
+            $schema['event_id']=$eventId;
+            $schema['updated_at']=date(DATE_ATOM);
+            return ['data'=>$schema,'result'=>$schema];
+        },$defaults);
     }
 
     private function validateFields(array $fields): array
