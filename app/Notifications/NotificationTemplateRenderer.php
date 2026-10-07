@@ -23,6 +23,13 @@ final class NotificationTemplateRenderer
         }
 
         return match($template){
+            'event_invitation'=>[
+                'subject'=>'You’re invited — '.((string)($data['event_name']??'Event invitation')),
+                'html'=>'<h2>You’re invited</h2><p>You have been invited to '.htmlspecialchars((string)($data['event_name']??'this event'),ENT_QUOTES|ENT_SUBSTITUTE,'UTF-8').'.</p><p><a href="'.htmlspecialchars($this->invitationUrl((string)($data['event_id']??''),(string)($data['invitation_token']??'')),ENT_QUOTES).'">Open invitation and register</a></p>',
+                'text'=>'You’re invited to '.((string)($data['event_name']??'this event')).'. Open invitation: '.$this->invitationUrl((string)($data['event_id']??''),(string)($data['invitation_token']??'')),
+                'whatsapp_template'=>'event_invitation',
+                'whatsapp_parameters'=>[$this->invitationUrl((string)($data['event_id']??''),(string)($data['invitation_token']??''))],
+            ],
             'payment_confirmed'=>[
                 'subject'=>'Payment confirmed — your DigiSangam registration',
                 'html'=>'<h2>Payment confirmed</h2><p>Your event registration payment has been received.</p>'.($confirmation!==''?'<p><a href="'.htmlspecialchars($confirmation,ENT_QUOTES).'">Open your ticket and QR</a></p>':''),
@@ -45,6 +52,14 @@ final class NotificationTemplateRenderer
                 'whatsapp_parameters'=>[$confirmation],
             ],
         };
+    }
+
+    private function invitationUrl(string $eventId,string $token): string
+    {
+        if($eventId===''||$token==='') return '';
+        $base=rtrim((string)getenv('APP_URL'),'/');
+        $path='/e/'.rawurlencode($eventId).'?invite='.rawurlencode($token);
+        return $base===''?$path:$base.$path;
     }
 
     private function confirmationUrl(string $eventId,string $token): string
