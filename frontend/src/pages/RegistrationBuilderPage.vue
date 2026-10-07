@@ -73,6 +73,13 @@ function invitationLink(invite){
 async function copyInvitation(invite){
   await navigator.clipboard.writeText(invitationLink(invite))
 }
+async function sendInvitation(invite){
+  error.value=''
+  try{
+    const result=await api.sendInvitation(invite.id)
+    Object.assign(invite,result.invitation)
+  }catch(e){error.value=e.message}
+}
 async function revokeInvitation(invite){
   try{Object.assign(invite,await api.revokeInvitation(invite.id))}catch(e){error.value=e.message}
 }
@@ -108,7 +115,7 @@ async function invite(){
     <div v-if="invites.length" class="mt-4 space-y-2 border-t border-slate-100 pt-4">
       <div v-for="row in invites.slice(0,8)" :key="row.id" class="rounded-xl bg-slate-50 p-3">
         <div class="flex items-start justify-between gap-2"><div class="min-w-0"><p class="truncate text-xs font-bold">{{row.email}}</p><p class="mt-1 text-[10px] text-slate-400">{{row.category}} · {{row.status}}</p></div><span class="status-badge" :class="row.status==='pending'?'badge-draft':row.status==='accepted'?'badge-published':'bg-rose-100 text-rose-700'">{{row.status}}</span></div>
-        <div v-if="row.status==='pending'" class="mt-2 flex gap-2"><button class="btn-secondary py-1 text-[10px]" @click="copyInvitation(row)">Copy link</button><button class="btn-secondary py-1 text-[10px] text-rose-600" @click="revokeInvitation(row)">Revoke</button></div>
+        <div v-if="row.status==='pending'" class="mt-2 flex flex-wrap gap-2"><button class="btn-primary py-1 text-[10px]" @click="sendInvitation(row)">{{row.queued_at?'Send again':'Send email'}}</button><button class="btn-secondary py-1 text-[10px]" @click="copyInvitation(row)">Copy link</button><button class="btn-secondary py-1 text-[10px] text-rose-600" @click="revokeInvitation(row)">Revoke</button></div><p v-if="row.queued_at" class="mt-2 text-[10px] text-slate-400">Email queued {{row.queued_at.slice(0,19).replace('T',' ')}}</p>
       </div>
     </div>
   </div>
