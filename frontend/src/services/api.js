@@ -43,6 +43,7 @@ async function request(path,options={}){
 
 export const api={
   publicEvents:()=>publicRequest('/public/events'),
+  publicInvitation:(token)=>publicRequest('/public/invitations/'+encodeURIComponent(token)),
   publicEvent:(id)=>publicRequest('/public/events/'+encodeURIComponent(id)),
   publicRegister:(id,payload)=>publicRequest('/public/events/'+encodeURIComponent(id)+'/register',{method:'POST',body:JSON.stringify(payload)}),
   publicVerifyRazorpay:(payload)=>publicRequest('/public/payments/razorpay/verify',{method:'POST',body:JSON.stringify(payload)}),
@@ -64,6 +65,7 @@ export const api={
   saveRegistration:(eventId,payload)=>request('/events/'+encodeURIComponent(eventId)+'/registration',{method:'PUT',body:JSON.stringify(payload)}),
   invitations:(eventId='')=>request('/invitations'+(eventId?'?event_id='+encodeURIComponent(eventId):'')),
   createInvitation:(payload)=>request('/invitations',{method:'POST',body:JSON.stringify(payload)}),
+  revokeInvitation:(id)=>request('/invitations/'+encodeURIComponent(id)+'/revoke',{method:'POST',body:'{}'}),
   attendees:(eventId='')=>request('/attendees'+(eventId?'?event_id='+encodeURIComponent(eventId):'')),
   attendee:(id)=>request('/attendees/'+encodeURIComponent(id)),
   createAttendee:(payload)=>request('/attendees',{method:'POST',body:JSON.stringify(payload)}),
@@ -133,6 +135,7 @@ export const api={
     return uploadRequest('/public/events/'+encodeURIComponent(eventId)+'/media',data,{publicMode:true})
   },
   publicMediaUrl:(id)=>apiBase+'/public/media/'+encodeURIComponent(id),
+  mediaUrl:(id)=>apiBase+'/media/'+encodeURIComponent(id),
   issueWallet:(token,platform)=>publicRequest('/public/confirmations/'+encodeURIComponent(token)+'/wallet',{method:'POST',body:JSON.stringify({platform})}),
   walletPasses:(eventId)=>request('/wallet-passes?event_id='+encodeURIComponent(eventId)),
   credentialBindings:(eventId)=>request('/credential-bindings?event_id='+encodeURIComponent(eventId)),
