@@ -5,6 +5,7 @@ use DigiSangam\Badges\BadgeTemplateRepository;
 use DigiSangam\Badges\PrintJobRepository;
 use DigiSangam\Core\Storage\JsonFileStore;
 use DigiSangam\Credentials\CredentialService;
+use DigiSangam\Credentials\CredentialSecret;
 use DigiSangam\Operations\WorkerHeartbeatRepository;
 use DigiSangam\Printing\BadgePrintWorker;
 use DigiSangam\Printing\CupsPrintProvider;
@@ -18,15 +19,7 @@ $provider=match($providerName){
     'cups'=>new CupsPrintProvider((string)getenv('PRINTER_QUEUE')),
     default=>new LogPrintProvider(),
 };
-$credentialSecret=trim((string)getenv('DIGISANGAM_CREDENTIAL_SECRET'));
-if($credentialSecret===''){
-    $record=$store->read('secrets/credential.json',[]);
-    $credentialSecret=(string)($record['secret']??'');
-    if($credentialSecret===''){
-        $credentialSecret=bin2hex(random_bytes(32));
-        $store->write('secrets/credential.json',['secret'=>$credentialSecret,'created_at'=>date(DATE_ATOM)]);
-    }
-}
+$credentialSecret=CredentialSecret::resolve($store);
 $result=(new BadgePrintWorker(
     new PrintJobRepository($store),
     new AttendeeRepository($store),
