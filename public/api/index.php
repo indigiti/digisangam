@@ -245,6 +245,7 @@ try {
             new RegistrationRepository($store),
             new NotificationOutbox($store),
             $journal,
+            new TicketRepository($store),
         ))->handleRazorpay($payload);
         if(empty($result['duplicate']) && ($result['order']['status'] ?? '')==='paid' && !empty($result['attendee'])){
             $context=(array)$result['attendee'];
