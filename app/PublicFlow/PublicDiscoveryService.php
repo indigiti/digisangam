@@ -23,7 +23,7 @@ final class PublicDiscoveryService
             $eventId=(string)($event['id']??'');
             $tickets=$this->tickets->publicForEvent($eventId);
             $prices=array_map(static fn(array $t): int => (int)($t['price']??0),$tickets);
-            $available=array_sum(array_map(static fn(array $t): int => max(0,(int)($t['quantity']??0)-(int)($t['sold']??0)),$tickets));
+            $available=array_sum(array_map(static fn(array $t): int => max(0,(int)($t['quantity']??0)-(int)($t['sold']??0)-(int)($t['reserved']??0)),$tickets));
 
             $rows[]=[
                 'id'=>$eventId,
