@@ -8,7 +8,7 @@ use DigiSangam\Core\Storage\JsonFileStore;
 final class MediaRepository
 {
     private const MIME_EXT=[
-        'image/jpeg'=>'jpg','image/png'=>'png','image/webp'=>'webp','image/svg+xml'=>'svg',
+        'image/jpeg'=>'jpg','image/png'=>'png','image/webp'=>'webp',
         'application/pdf'=>'pdf','text/plain'=>'txt'
     ];
 
