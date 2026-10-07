@@ -419,6 +419,23 @@ try {
         JsonResponse::send($scanner()->verify((string)($input['payload'] ?? ''),(string)($input['zone_id'] ?? '')));
     }
 
+    if ($method === 'POST' && $path === '/scanner/exit') {
+        $user=$auth->requirePermission('attendees.checkin');
+        $input=$body();
+        $result=$scanner()->exit((string)($input['payload']??''),(string)$user['id'],(string)($input['zone_id']??''));
+        if(!empty($result['allowed']) && empty($result['already_exited'])){
+            $journal->append('attendee.exited',[
+                'attendee_id'=>$result['attendee']['id']??null,
+                'event_id'=>$result['event_id']??null,
+                'operator_id'=>$user['id'],
+                'zone_id'=>$result['access_event']['event']['zone_id']??null,
+            ]);
+            $privateAttendee=(new AttendeeRepository($store))->find((string)($result['attendee']['id']??''));
+            if($privateAttendee) $automation()->fire('attendee.exited',$privateAttendee);
+        }
+        JsonResponse::send($result,!empty($result['allowed'])?200:422);
+    }
+
     if ($method === 'POST' && $path === '/scanner/checkin') {
         $user=$auth->requirePermission('attendees.checkin');
         $input=$body();
@@ -1170,6 +1187,37 @@ try {
         $record=(new SeatAssignmentRepository($store))->assign($m[1],$input);
         $journal->append('seat.assigned',['event_id'=>$m[1],'attendee_id'=>$record['attendee_id'],'seat'=>$record['seat']]);
         JsonResponse::send($record,201);
+    }
+
+    if($method==='GET' && $path==='/onground/live'){
+        $auth->requirePermission('onground.view');
+        $eventId=trim((string)($_GET['event_id']??''));
+        $requireEvent($eventId);
+        $access=new AccessEventRepository($store);
+        $attendeeRepo=new AttendeeRepository($store);
+        $users=[];
+        foreach($auth->allUsers() as $user) $users[(string)$user['id']]=$user;
+        $decorate=static function(array $row) use ($attendeeRepo,$users): array {
+            $attendee=$attendeeRepo->find((string)($row['attendee_id']??''));
+            $operator=$users[(string)($row['operator_id']??'')]??null;
+            return $row+[
+                'attendee'=>$attendee?[
+                    'id'=>$attendee['id'],'name'=>$attendee['name'],'email'=>$attendee['email']??'',
+                    'category'=>$attendee['category']??'','company'=>$attendee['company']??'',
+                ]:null,
+                'operator'=>$operator?['id'=>$operator['id'],'name'=>$operator['name'],'email'=>$operator['email']??'']:null,
+            ];
+        };
+        $recent=array_map($decorate,$access->recent($eventId,(int)($_GET['limit']??100)));
+        $inside=array_map($decorate,$access->currentlyInside($eventId));
+        JsonResponse::send([
+            'event_id'=>$eventId,
+            'currently_inside'=>count($inside),
+            'occupancy'=>$access->currentOccupancy($eventId),
+            'inside'=>$inside,
+            'recent'=>$recent,
+            'generated_at'=>date(DATE_ATOM),
+        ]);
     }
 
     // Phase 2 — signed offline package for OnGround clients
