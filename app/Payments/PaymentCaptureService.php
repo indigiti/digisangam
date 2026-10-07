@@ -27,17 +27,26 @@ final class PaymentCaptureService
         if(!$order) throw new \RuntimeException('Order not found.');
         if(($order['status']??'')==='paid') return ['order'=>$order,'attendee'=>$this->attendees->find((string)$order['attendee_id']),'duplicate'=>true];
 
-        $committed=false;
-        if(!empty($order['ticket_id'])){
-            $this->tickets->commitReservation((string)$order['ticket_id'],(string)$order['event_id']);
-            $committed=true;
+        $locked=$this->orders->transitionStatus($orderId,['pending'],'capturing');
+        if(!$locked){
+            $current=$this->orders->find($orderId);
+            if(($current['status']??'')==='paid') return ['order'=>$current,'attendee'=>$this->attendees->find((string)$current['attendee_id']),'duplicate'=>true];
+            throw new \RuntimeException('Order is not available for payment capture.');
         }
+        $order=$locked;
+
+        $committed=false;
         try{
+            if(!empty($order['ticket_id'])){
+                $this->tickets->commitReservation((string)$order['ticket_id'],(string)$order['event_id']);
+                $committed=true;
+            }
             $order=$this->orders->updatePayment($orderId,[
                 'status'=>'paid','provider'=>$provider,'payment_reference'=>$paymentReference,'reservation_expires_at'=>'',
             ]) ?? $order;
         }catch(\Throwable $e){
             if($committed)$this->tickets->releaseSold((string)$order['ticket_id'],(string)$order['event_id']);
+            $this->orders->transitionStatus($orderId,['capturing'],'pending');
             throw $e;
         }
 
