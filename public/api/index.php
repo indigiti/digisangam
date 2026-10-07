@@ -823,6 +823,21 @@ try {
         JsonResponse::send($invite,201);
     }
 
+    if ($method === 'POST' && preg_match('#^/invitations/([^/]+)/send$#',$path,$m)) {
+        $auth->requirePermission('registration.manage');
+        $invite=$invitations->find($m[1]);
+        if(!$invite) JsonResponse::send(['error'=>'Invitation not found.'],404);
+        if(($invite['status']??'')!=='pending') throw new RuntimeException('Only pending invitations can be sent.');
+        $event=$requireEvent((string)$invite['event_id']);
+        $message=(new NotificationOutbox($store))->queue('email','event_invitation',['email'=>$invite['email']],[
+            'event_id'=>$invite['event_id'],'event_name'=>$event['name']??'Event',
+            'invitation_id'=>$invite['id'],'invitation_token'=>$invite['token'],'category'=>$invite['category']??'General',
+        ]);
+        $invite=$invitations->markSent((string)$invite['id'],(string)$message['id'])??$invite;
+        $journal->append('invitation.queued',['invitation_id'=>$invite['id'],'event_id'=>$invite['event_id'],'message_id'=>$message['id']]);
+        JsonResponse::send(['invitation'=>$invite,'message'=>$message]);
+    }
+
     if ($method === 'POST' && preg_match('#^/invitations/([^/]+)/revoke$#',$path,$m)) {
         $auth->requirePermission('registration.manage');
         $invite=$invitations->revoke($m[1]);
