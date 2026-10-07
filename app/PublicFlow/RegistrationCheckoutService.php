@@ -8,6 +8,7 @@ use DigiSangam\Commerce\OrderRepository;
 use DigiSangam\Credentials\CredentialService;
 use DigiSangam\Events\EventRepository;
 use DigiSangam\Invitations\InvitationRepository;
+use DigiSangam\Media\MediaRepository;
 use DigiSangam\Notifications\NotificationOutbox;
 use DigiSangam\Payments\PaymentService;
 use DigiSangam\Registration\RegistrationRepository;
@@ -25,6 +26,7 @@ final class RegistrationCheckoutService
         private readonly NotificationOutbox $notifications,
         private readonly CredentialService $credentials,
         private readonly PaymentService $payments,
+        private readonly MediaRepository $media,
     ) {}
 
     public function publicEvent(string $eventId): array
@@ -69,7 +71,8 @@ final class RegistrationCheckoutService
         $answers = $this->validateAnswers(
             (array)($schema['fields'] ?? []),
             $submitted,
-            (array)($schema['categories'] ?? [])
+            (array)($schema['categories'] ?? []),
+            $eventId
         );
 
         $email = strtolower(trim((string)($answers['fld_email'] ?? $input['email'] ?? '')));
@@ -169,7 +172,7 @@ final class RegistrationCheckoutService
         ];
     }
 
-    private function validateAnswers(array $fields,array $submitted,array $categories): array
+    private function validateAnswers(array $fields,array $submitted,array $categories,string $eventId): array
     {
         $answers=[];
         foreach($fields as $field){
@@ -203,6 +206,15 @@ final class RegistrationCheckoutService
             }
             if($type==='date' && !preg_match('/^\d{4}-\d{2}-\d{2}$/',(string)$value)){
                 throw new \InvalidArgumentException($label.' must be a valid date.');
+            }
+
+            if($type==='file'){
+                $mediaId=(string)$value;
+                $media=$this->media->find($mediaId);
+                if(!$media || ($media['event_id']??'')!==$eventId || ($media['kind']??'')!=='registration_file'){
+                    throw new \InvalidArgumentException($label.' contains an invalid upload.');
+                }
+                $answers[$id]=$mediaId;
             }
 
             if(in_array($type,['select','dropdown','radio'],true)){
