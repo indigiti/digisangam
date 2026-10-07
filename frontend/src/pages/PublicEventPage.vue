@@ -132,7 +132,7 @@ async function submit(){
       <div class="relative mx-auto grid max-w-[1240px] gap-7 px-4 py-7 sm:px-6 lg:grid-cols-[250px_minmax(0,1fr)_230px] lg:items-center lg:py-9">
         <div class="mx-auto w-full max-w-[250px]">
           <div class="aspect-[2/3] overflow-hidden rounded-[12px] bg-slate-800 shadow-[0_16px_45px_rgba(0,0,0,.35)]">
-            <img v-if="data.event.branding?.cover_url" :src="data.event.branding.cover_url" :alt="data.event.name" class="h-full w-full object-cover"/>
+            <img v-if="data.event.branding?.poster_url||data.event.branding?.cover_url" :src="data.event.branding?.poster_url||data.event.branding?.cover_url" :alt="data.event.name" class="h-full w-full object-cover"/>
             <div v-else class="flex h-full items-end p-5" :style="{background:'linear-gradient(145deg,'+(data.event.branding?.primary_color||'#f84464')+','+(data.event.branding?.secondary_color||'#6d28d9')+')'}"><div><p class="text-[10px] font-black uppercase tracking-[.18em] text-white/65">{{data.event.category}}</p><h2 class="mt-2 text-xl font-black">{{data.event.name}}</h2></div></div>
           </div>
         </div>
