@@ -29,21 +29,26 @@ final class MeetingRepository
         ];
         if($record['exhibitor_id']===''||$record['attendee_id']==='') throw new \InvalidArgumentException('Exhibitor and attendee are required.');
         if(($record['event_id']??'')==='') throw new \InvalidArgumentException('Event is required.');
-        $rows=$this->all(); array_unshift($rows,$record);
-        $this->store->write('exhibitors/meetings.json',$rows);
-        return $record;
+        return $this->store->transaction('exhibitors/meetings.json',static function(array $rows) use ($record): array {
+            array_unshift($rows,$record);
+            return ['data'=>$rows,'result'=>$record];
+        },[]);
     }
 
     public function update(string $id,array $input): ?array
     {
-        $rows=$this->all();$updated=null;
-        foreach($rows as &$row){
-            if(($row['id']??'')!==$id) continue;
-            foreach(['start_at','duration_minutes','location','status'] as $field) if(array_key_exists($field,$input)) $row[$field]=$input[$field];
-            $row['updated_at']=date(DATE_ATOM);$updated=$row;break;
-        }
-        unset($row);
-        if($updated!==null)$this->store->write('exhibitors/meetings.json',$rows);
-        return $updated;
+        return $this->store->transaction('exhibitors/meetings.json',static function(array $rows) use ($id,$input): array {
+            $updated=null;
+            foreach($rows as &$row){
+                if(($row['id']??'')!==$id) continue;
+                foreach(['start_at','location','status'] as $field){
+                    if(array_key_exists($field,$input)) $row[$field]=trim((string)$input[$field]);
+                }
+                if(array_key_exists('duration_minutes',$input)) $row['duration_minutes']=max(10,(int)$input['duration_minutes']);
+                $row['updated_at']=date(DATE_ATOM);$updated=$row;break;
+            }
+            unset($row);
+            return ['data'=>$rows,'result'=>$updated];
+        },[]);
     }
 }
