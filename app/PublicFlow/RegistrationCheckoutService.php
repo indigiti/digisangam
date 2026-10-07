@@ -32,7 +32,11 @@ final class RegistrationCheckoutService
     public function publicEvent(string $eventId): array
     {
         $event=$this->events->find($eventId);
-        if(!$event || !in_array((string)($event['status']??''),['Published','Live'],true)){
+        if(
+            !$event ||
+            !in_array((string)($event['status']??''),['Published','Live'],true) ||
+            ($event['privacy']??'public')==='private'
+        ){
             throw new \RuntimeException('Event is not available for registration.');
         }
         return $this->eventPayload($eventId,$event);
