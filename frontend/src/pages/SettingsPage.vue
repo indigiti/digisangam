@@ -6,7 +6,7 @@ import { useAuthStore } from '../stores/auth'
 
 const auth=useAuthStore(),router=useRouter()
 const saved=ref(false),busy=ref(false),error=ref(''),tab=ref('workspace')
-const team=ref([]),roles=ref([]),showUser=ref(false),teamBusy=ref(false)
+const team=ref([]),roles=ref([]),showUser=ref(false),teamBusy=ref(false),ops=ref(null),opsBusy=ref(false)
 const canManageTeam=computed(()=>['super_admin','workspace_admin'].includes(auth.user?.role))
 const form=reactive({name:'',brand:'',legal_name:'',gstin:'',billing_address:'',timezone:'Asia/Kolkata',currency:'INR',country:'IN'})
 const userForm=reactive({name:'',email:'',password:'',role:'viewer'})
@@ -23,6 +23,11 @@ async function load(){
 }
 onMounted(load)
 
+async function loadOperations(){
+  if(!canManageTeam.value)return
+  opsBusy.value=true;error.value=''
+  try{ops.value=await api.operationsHealth()}catch(e){error.value=e.message}finally{opsBusy.value=false}
+}
 async function save(){
   busy.value=true;saved.value=false;error.value=''
   try{Object.assign(form,await api.updateWorkspace(form));saved.value=true}
@@ -60,6 +65,7 @@ async function signout(){await auth.logout();router.replace('/access')}
 <div class="panel flex flex-wrap gap-1 p-2">
   <button class="tab-btn" :class="{active:tab==='workspace'}" @click="tab='workspace'">Workspace</button>
   <button class="tab-btn" :class="{active:tab==='team'}" @click="tab='team'">Team & Roles</button>
+  <button v-if="canManageTeam" class="tab-btn" :class="{active:tab==='operations'}" @click="tab='operations';loadOperations()">Operations</button>
   <button class="tab-btn" :class="{active:tab==='account'}" @click="tab='account'">My Account</button>
 </div>
 
@@ -125,6 +131,15 @@ async function signout(){await auth.logout();router.replace('/access')}
       <div v-for="role in roles" :key="role" class="rounded-2xl border border-slate-200 p-4"><b class="text-sm">{{roleLabel(role)}}</b><p class="mt-1 text-xs text-slate-500">{{role==='super_admin'?'Full platform access':role==='workspace_admin'?'Workspace and all event operations':role==='event_manager'?'Event setup and operations':role==='registration_manager'?'Registration and attendee operations':role==='finance'?'Commerce and financial reporting':role==='onsite'?'Check-in and onsite operations':'Read-only operational access'}}</p></div>
     </div>
   </section>
+</section>
+
+<section v-else-if="tab==='operations'" class="space-y-5">
+  <div class="flex flex-col justify-between gap-3 sm:flex-row sm:items-end"><div><p class="panel-kicker">Runtime operations</p><h2 class="panel-title">Background worker health</h2><p class="mt-1 text-sm text-slate-500">Workers should run on schedule. Stale or never-run workers can cause delayed messages, webhooks, printing, expired payment holds or orphan media.</p></div><button class="btn-secondary" :disabled="opsBusy" @click="loadOperations">{{opsBusy?'Refreshing…':'Refresh'}}</button></div>
+  <section class="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
+    <article v-for="w in ops?.workers||[]" :key="w.name" class="panel p-5"><div class="flex items-center justify-between gap-2"><p class="panel-kicker">{{w.name}}</p><span class="status-badge" :class="w.state==='healthy'?'badge-published':w.state==='stale'?'bg-amber-100 text-amber-700':'bg-rose-100 text-rose-700'">{{w.state}}</span></div><p class="mt-3 text-xs text-slate-500">{{w.last_run_at?('Last '+w.last_run_at.slice(0,19).replace('T',' ')):'No heartbeat recorded'}}</p><p v-if="w.age_seconds!==null" class="mt-1 text-[10px] text-slate-400">{{Math.round(w.age_seconds/60)}} min ago</p></article>
+  </section>
+  <section class="panel overflow-hidden"><div class="border-b p-5"><p class="panel-kicker">Queues</p><h2 class="panel-title">Pending and failed work</h2></div><div class="overflow-x-auto"><table class="data-table"><thead><tr><th>Queue</th><th>Pending</th><th>Failed</th></tr></thead><tbody><tr v-for="(q,name) in ops?.queues||{}" :key="name"><td class="font-semibold">{{name.replaceAll('_',' ')}}</td><td>{{q.pending??q.pending_cleanup??0}}</td><td>{{q.failed??0}}</td></tr></tbody></table></div></section>
+  <p class="rounded-2xl bg-amber-50 p-4 text-xs leading-5 text-amber-800">Production scheduling should run notifications, webhooks, badge printing and order-expiry about every 5 minutes, and media cleanup hourly. A worker showing <b>never_run</b> after deployment means its server cron is not configured.</p>
 </section>
 
 <section v-else class="grid gap-5 lg:grid-cols-[1fr_.65fr]">
