@@ -55,10 +55,11 @@ final class WalkInRegistrationService
                     'payment_reference'=>trim((string)($input['payment_reference']??'')),
                 ]);
             }
+            if($ticket&&$settled)$ticket=$this->tickets->commitReservation($ticketId,$eventId);
             $credential=$status==='Confirmed'?$this->credentials->issue((string)$attendee['id'],$eventId):null;
             return ['attendee'=>$attendee,'ticket'=>$ticket,'order'=>$order,'credential'=>$credential];
         }catch(\Throwable $e){
-            if($ticket) $this->tickets->releaseOne($ticketId,$eventId);
+            if($ticket) $this->tickets->releaseReservation($ticketId,$eventId);
             throw $e;
         }
     }
