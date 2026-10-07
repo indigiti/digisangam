@@ -31,23 +31,28 @@ final class BadgeTemplateRepository
         ];
         if($record['event_id']==='') throw new \InvalidArgumentException('Event is required.');
         if($record['name']==='') throw new \InvalidArgumentException('Badge template name is required.');
-        $rows=$this->all(); array_unshift($rows,$record);
-        $this->store->write('badges/templates.json',$rows);
-        return $record;
+        return $this->store->transaction('badges/templates.json',static function(array $rows) use ($record): array {
+            array_unshift($rows,$record);
+            return ['data'=>$rows,'result'=>$record];
+        },[]);
     }
 
     public function update(string $id,array $input): ?array
     {
-        $rows=$this->all(); $updated=null;
-        foreach($rows as &$row){
-            if(($row['id']??'')!==$id) continue;
-            foreach(['name','background','accent','category','show_qr','width_mm','height_mm'] as $field) if(array_key_exists($field,$input)) $row[$field]=$input[$field];
-            if(isset($input['fields'])&&is_array($input['fields'])) $row['fields']=$input['fields'];
-            $row['updated_at']=date(DATE_ATOM); $updated=$row; break;
-        }
-        unset($row);
-        if($updated!==null) $this->store->write('badges/templates.json',$rows);
-        return $updated;
+        return $this->store->transaction('badges/templates.json',static function(array $rows) use ($id,$input): array {
+            $updated=null;
+            foreach($rows as &$row){
+                if(($row['id']??'')!==$id) continue;
+                foreach(['name','background','accent','category'] as $field) if(array_key_exists($field,$input)) $row[$field]=trim((string)$input[$field]);
+                if(array_key_exists('show_qr',$input)) $row['show_qr']=(bool)$input['show_qr'];
+                foreach(['width_mm','height_mm'] as $field) if(array_key_exists($field,$input)) $row[$field]=max(40,(int)$input[$field]);
+                if(isset($input['fields'])&&is_array($input['fields'])) $row['fields']=array_values($input['fields']);
+                if(trim((string)($row['name']??''))==='') throw new \InvalidArgumentException('Badge template name is required.');
+                $row['updated_at']=date(DATE_ATOM); $updated=$row; break;
+            }
+            unset($row);
+            return ['data'=>$rows,'result'=>$updated];
+        },[]);
     }
 
 }
