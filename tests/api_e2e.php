@@ -215,6 +215,7 @@ try{
         'answers'=>[
             'fld_name'=>'Invited HTTP User',
             'fld_email'=>'invite-http@example.test',
+            'fld_phone'=>'919800000123',
             'fld_category'=>'General',
         ],
         'website'=>'',
