@@ -535,14 +535,34 @@ try {
         $actor=$auth->requirePermission('accreditation.manage');$input=$body();$eventId=(string)($input['event_id']??'');$requireEvent($eventId);
         $attendee=(new AttendeeRepository($store))->find((string)($input['attendee_id']??''));
         if(!$attendee||($attendee['event_id']??'')!==$eventId) JsonResponse::send(['error'=>'Attendee does not belong to this event.'],422);
+        $mediaRepo=new MediaRepository($store);
+        foreach((array)($input['documents']??[]) as $mediaId){
+            $media=$mediaRepo->find((string)$mediaId);
+            if(!$media||($media['event_id']??'')!==$eventId||($media['kind']??'')!=='accreditation_document'||!empty($media['public'])){
+                throw new InvalidArgumentException('Accreditation document is invalid or belongs to another event.');
+            }
+        }
         $record=(new AccreditationRepository($store))->create($input);
         $journal->append('accreditation.submitted',['event_id'=>$eventId,'accreditation_id'=>$record['id'],'attendee_id'=>$record['attendee_id'],'actor_id'=>$actor['id']]);
         JsonResponse::send($record,201);
     }
     if (preg_match('#^/accreditation/([^/]+)$#',$path,$m) && in_array($method,['PATCH','PUT'],true)) {
         $actor=$auth->requirePermission('accreditation.manage');
-        $record=(new AccreditationRepository($store))->update($m[1],$body(),(string)$actor['id']);
-        if(!$record) JsonResponse::send(['error'=>'Accreditation record not found.'],404);
+        $accreditationRepo=new AccreditationRepository($store);
+        $existingAccreditation=null;
+        foreach($accreditationRepo->all() as $row) if(($row['id']??'')===$m[1]){$existingAccreditation=$row;break;}
+        if(!$existingAccreditation) JsonResponse::send(['error'=>'Accreditation record not found.'],404);
+        $updateInput=$body();
+        if(array_key_exists('documents',$updateInput)){
+            $mediaRepo=new MediaRepository($store);
+            foreach((array)$updateInput['documents'] as $mediaId){
+                $media=$mediaRepo->find((string)$mediaId);
+                if(!$media||($media['event_id']??'')!==($existingAccreditation['event_id']??'')||($media['kind']??'')!=='accreditation_document'||!empty($media['public'])){
+                    throw new InvalidArgumentException('Accreditation document is invalid or belongs to another event.');
+                }
+            }
+        }
+        $record=$accreditationRepo->update($m[1],$updateInput,(string)$actor['id']);
         $journal->append('accreditation.updated',['event_id'=>$record['event_id'],'accreditation_id'=>$record['id'],'status'=>$record['status'],'actor_id'=>$actor['id']]);
         JsonResponse::send($record);
     }
@@ -816,6 +836,9 @@ try {
             $event = $events->update($eventId,$input);
             if (!$event) JsonResponse::send(['error'=>'Event not found.'],404);
             $journal->append('event.updated',['event_id'=>$eventId,'status'=>$event['status']??null]);
+            $wasTerminal=in_array((string)($existing['status']??''),['Completed','Archived'],true);
+            $isTerminal=in_array((string)($event['status']??''),['Completed','Archived'],true);
+            if(!$wasTerminal&&$isTerminal) $automation()->fire('event.ended',$event);
             JsonResponse::send($eventView($event));
         }
     }
@@ -1213,7 +1236,15 @@ try {
         $attendee=(new AttendeeRepository($store))->find((string)($input['attendee_id']??''));
         if(!$exhibitor||($exhibitor['event_id']??'')!==$event['id']) throw new InvalidArgumentException('Exhibitor does not belong to this event.');
         if(!$attendee||($attendee['event_id']??'')!==$event['id']) throw new InvalidArgumentException('Attendee does not belong to this event.');
-        $record=(new LeadRepository($store))->create($input);
+        $leadRepo=new LeadRepository($store);
+        $leadQuota=max(0,(int)($exhibitor['lead_quota']??0));
+        if($leadQuota>0){
+            $captured=count(array_filter($leadRepo->all(),static fn(array $row): bool =>
+                ($row['event_id']??'')===$event['id'] && ($row['exhibitor_id']??'')===$exhibitor['id']
+            ));
+            if($captured>=$leadQuota) throw new RuntimeException('Exhibitor lead quota has been reached.');
+        }
+        $record=$leadRepo->create($input);
         $journal->append('lead.captured',['lead_id'=>$record['id'],'exhibitor_id'=>$record['exhibitor_id'],'event_id'=>$record['event_id']]);
         JsonResponse::send($record,201);
     }
@@ -1287,9 +1318,20 @@ try {
         $venue=(new VenueRepository($store))->get($event['id']);$hall=null;
         foreach((array)($venue['seating']??[]) as $row) if(($row['id']??'')===($input['hall_id']??'')){$hall=$row;break;}
         if(!$hall||($hall['type']??'')!=='reserved') throw new InvalidArgumentException('Reserved seating hall not found for this event.');
-        $record=(new SeatAssignmentRepository($store))->assign($m[1],$input);
+        $record=(new SeatAssignmentRepository($store))->assign($m[1],$input,$hall);
         $journal->append('seat.assigned',['event_id'=>$m[1],'attendee_id'=>$record['attendee_id'],'seat'=>$record['seat']]);
         JsonResponse::send($record,201);
+    }
+    if($method==='DELETE' && preg_match('#^/venue/([^/]+)/seats/([^/]+)$#',$path,$m)){
+        $auth->requirePermission('venue.manage');
+        $requireEvent($m[1]);
+        $seatRepo=new SeatAssignmentRepository($store);
+        $assignment=null;
+        foreach($seatRepo->all($m[1]) as $row) if(($row['id']??'')===$m[2]){$assignment=$row;break;}
+        if(!$assignment) JsonResponse::send(['error'=>'Seat assignment not found.'],404);
+        $seatRepo->unassign($m[1],$m[2]);
+        $journal->append('seat.unassigned',['event_id'=>$m[1],'attendee_id'=>$assignment['attendee_id']??'','seat'=>$assignment['seat']??'']);
+        JsonResponse::send(['ok'=>true]);
     }
 
     if($method==='GET' && $path==='/onground/live'){
