@@ -55,6 +55,7 @@ final class EventRepository
                 'brand_name'=>trim((string)($input['branding']['brand_name']??$name)),
                 'logo_url'=>trim((string)($input['branding']['logo_url']??'')),
                 'cover_url'=>trim((string)($input['branding']['cover_url']??'')),
+                'poster_url'=>trim((string)($input['branding']['poster_url']??'')),
                 'primary_color'=>$this->color((string)($input['branding']['primary_color']??'#4f46e5'),'#4f46e5'),
                 'secondary_color'=>$this->color((string)($input['branding']['secondary_color']??'#06b6d4'),'#06b6d4'),
                 'background_color'=>$this->color((string)($input['branding']['background_color']??'#0f172a'),'#0f172a'),
