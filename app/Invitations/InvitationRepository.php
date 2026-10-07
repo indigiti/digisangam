@@ -14,6 +14,14 @@ final class InvitationRepository
         return $this->store->read('invitations/index.json', []);
     }
 
+    public function findByToken(string $token): ?array
+    {
+        foreach($this->all() as $row){
+            if(($row['token']??'')===$token) return $row;
+        }
+        return null;
+    }
+
     public function create(array $input): array
     {
         $rows=$this->all();
@@ -38,5 +46,36 @@ final class InvitationRepository
         array_unshift($rows,$record);
         $this->store->write('invitations/index.json',$rows);
         return $record;
+    }
+
+    public function revoke(string $id): ?array
+    {
+        $rows=$this->all();$updated=null;
+        foreach($rows as &$row){
+            if(($row['id']??'')!==$id) continue;
+            if(($row['status']??'')==='revoked'){ $updated=$row; break; }
+            $row['status']='revoked';
+            $row['revoked_at']=date(DATE_ATOM);
+            $updated=$row;
+            break;
+        }
+        unset($row);
+        if($updated!==null) $this->store->write('invitations/index.json',$rows);
+        return $updated;
+    }
+
+    public function markAccepted(string $token): ?array
+    {
+        $rows=$this->all();$updated=null;
+        foreach($rows as &$row){
+            if(($row['token']??'')!==$token) continue;
+            $row['status']='accepted';
+            $row['accepted_at']=date(DATE_ATOM);
+            $updated=$row;
+            break;
+        }
+        unset($row);
+        if($updated!==null) $this->store->write('invitations/index.json',$rows);
+        return $updated;
     }
 }
