@@ -4,10 +4,49 @@ import { useRoute } from 'vue-router'
 import { api } from '../services/api'
 import QrCredential from '../components/QrCredential.vue'
 import PublicConcierge from '../components/PublicConcierge.vue'
-const route=useRoute(),data=ref(null),loading=ref(true),error=ref(''),wallet=ref(null),walletBusy=ref(false)
+const route=useRoute(),data=ref(null),loading=ref(true),error=ref(''),wallet=ref(null),walletBusy=ref(false),retryBusy=ref(false)
 const money=(n,currency='INR')=>new Intl.NumberFormat('en-IN',{style:'currency',currency,maximumFractionDigits:0}).format(Number(n||0))
-onMounted(async()=>{try{data.value=await api.publicConfirmation(route.params.token)}catch(e){error.value=e.message}finally{loading.value=false}})
+async function reload(){data.value=await api.publicConfirmation(route.params.token)}
+onMounted(async()=>{try{await reload()}catch(e){error.value=e.message}finally{loading.value=false}})
 function printDocument(){window.print()}
+function loadRazorpay(){
+  return new Promise((resolve,reject)=>{
+    if(window.Razorpay){resolve();return}
+    const existing=document.querySelector('script[data-digisangam-razorpay]')
+    if(existing){existing.addEventListener('load',resolve,{once:true});existing.addEventListener('error',()=>reject(new Error('Unable to load Razorpay Checkout.')),{once:true});return}
+    const script=document.createElement('script');script.src='https://checkout.razorpay.com/v1/checkout.js';script.async=true;script.dataset.digisangamRazorpay='1';script.onload=resolve;script.onerror=()=>reject(new Error('Unable to load Razorpay Checkout.'));document.head.appendChild(script)
+  })
+}
+async function retryPayment(){
+  retryBusy.value=true;error.value=''
+  try{
+    const result=await api.retryPublicPayment(route.params.token)
+    if(result.payment?.action==='razorpay_checkout'){
+      await loadRazorpay()
+      await new Promise((resolve,reject)=>{
+        const instance=new window.Razorpay({
+          key:result.payment.key_id,amount:result.payment.amount_subunits,currency:result.payment.currency,
+          name:result.event?.name||data.value?.event?.name||'DigiSangam',
+          description:result.payment.description,order_id:result.payment.provider_order_id,prefill:result.payment.prefill,
+          handler:async(response)=>{
+            try{
+              await api.publicVerifyRazorpay({
+                order_id:result.order.id,confirmation_token:route.params.token,
+                razorpay_order_id:response.razorpay_order_id,razorpay_payment_id:response.razorpay_payment_id,
+                razorpay_signature:response.razorpay_signature,
+              });resolve()
+            }catch(e){reject(e)}
+          },
+          modal:{ondismiss:resolve},
+        })
+        instance.on('payment.failed',response=>reject(new Error(response?.error?.description||'Payment failed.')))
+        instance.open()
+      })
+    }
+    await reload()
+  }catch(e){error.value=e.message}
+  finally{retryBusy.value=false}
+}
 async function issueWallet(platform){
   walletBusy.value=true;error.value=''
   try{wallet.value=await api.issueWallet(route.params.token,platform)}catch(e){error.value=e.message}finally{walletBusy.value=false}
@@ -26,7 +65,7 @@ async function issueWallet(platform){
           <div>
             <p class="text-xs font-black uppercase tracking-widest text-slate-400">Attendee</p><h2 class="mt-2 text-xl font-black">{{data.attendee.name}}</h2><p class="mt-1 text-sm text-slate-500">{{data.attendee.email}}</p>
             <div class="mt-6 grid gap-3 rounded-2xl bg-slate-50 p-5 text-sm"><div class="flex justify-between gap-4"><span class="text-slate-500">Ticket</span><b>{{data.ticket?.name||'—'}}</b></div><div class="flex justify-between gap-4"><span class="text-slate-500">Category</span><b>{{data.attendee.category}}</b></div><div class="flex justify-between gap-4"><span class="text-slate-500">Registration ID</span><b class="font-mono text-xs">{{data.attendee.id}}</b></div><div class="flex justify-between gap-4"><span class="text-slate-500">Venue</span><b class="text-right">{{data.event?.location}}</b></div><div v-if="data.order" class="flex justify-between gap-4"><span class="text-slate-500">Payment</span><b>{{data.order.status}}</b></div></div>
-            <p v-if="!data.credential" class="mt-5 rounded-2xl bg-amber-50 p-4 text-sm leading-6 text-amber-800">Your QR credential has not been issued yet. Payment or organizer approval is still pending. This confirmation link remains valid and will show the QR after the state changes.</p>
+            <p v-if="!data.credential" class="mt-5 rounded-2xl bg-amber-50 p-4 text-sm leading-6 text-amber-800">Your QR credential has not been issued yet. Payment or organizer approval is still pending. This confirmation link remains valid and will show the QR after the state changes.</p><button v-if="['expired','failed'].includes(data.order?.status)" class="no-print mt-3 w-full rounded-xl bg-indigo-600 px-4 py-3 text-sm font-black text-white disabled:opacity-50" :disabled="retryBusy" @click="retryPayment">{{retryBusy?'Preparing payment…':'Retry payment'}}</button>
           </div>
           <div v-if="data.credential"><p class="mb-3 text-center text-xs font-black uppercase tracking-widest text-slate-400">Entry QR</p><QrCredential :value="data.credential.payload"/><p class="mt-3 text-center text-xs leading-5 text-slate-400">Present this QR at event check-in.</p></div>
         </div>
