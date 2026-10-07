@@ -69,6 +69,7 @@ $manifest=json_decode((string)file_get_contents($release.'/private/build/release
 if(!is_array($manifest)
     || ($manifest['schema']??'')!=='DIGIOPS-RELEASE/1'
     || ($manifest['name']??'')!=='DigiSangam'
+    || ($manifest['version']??'')!=='3.1.0'
     || ($manifest['publicPath']??'')!=='public_html/digisangam/'
     || ($manifest['privatePath']??'')!=='private_html/digisangam/'
 ){
