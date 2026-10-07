@@ -175,8 +175,12 @@ try{
     ]);
     expect(count($attendees->all())===2,'Attendee creation failed.');
 
-    $invite=(new InvitationRepository($store))->create(['event_id'=>$eventId,'email'=>'invite@example.test','category'=>'VIP']);
+    $inviteRepo=new InvitationRepository($store);
+    $invite=$inviteRepo->create(['event_id'=>$eventId,'email'=>'invite@example.test','category'=>'VIP']);
     expect(($invite['event_id']??'')===$eventId,'Invitation is not event-scoped.');
+    expect(($inviteRepo->findByToken((string)$invite['token'])['email']??'')==='invite@example.test','Invitation token lookup failed.');
+    $inviteRepo->revoke((string)$invite['id']);
+    expect(($inviteRepo->findByToken((string)$invite['token'])['status']??'')==='revoked','Invitation revoke failed.');
 
     $orders=new OrderRepository($store);
     $order=$orders->create([
@@ -225,13 +229,19 @@ try{
     expect($credentials->verify($issued['token'].'x')===null,'Tampered credential accepted.');
 
     $checkins=new CheckinRepository($store);
-    $scanner=new ScannerService($credentials,$attendees,$orders,$checkins,new AccessPolicyService($venueRepo),new AccessEventRepository($store));
+    $accessRepo=new AccessEventRepository($store);
+    $scanner=new ScannerService($credentials,$attendees,$orders,$checkins,new AccessPolicyService($venueRepo),$accessRepo);
     $denied=$scanner->verify($credentials->issue($general['id'],$eventId)['payload'],'zone_vip');
     expect(($denied['allowed']??true)===false,'Zone policy allowed General attendee into VIP zone.');
     $checked=$scanner->checkin($issued['payload'],'usr_test','zone_vip');
     expect(($checked['allowed']??false)===true && empty($checked['already_checked_in']),'Valid attendee check-in failed.');
+    expect(($accessRepo->currentOccupancy($eventId)['zone_vip']??0)===1,'Live occupancy did not record venue entry.');
     $duplicate=$scanner->checkin($issued['payload'],'usr_test','zone_vip');
     expect(($duplicate['already_checked_in']??false)===true,'Duplicate event check-in was not detected.');
+    $exit=$scanner->exit($issued['payload'],'usr_test','zone_vip');
+    expect(($exit['reason']??'')==='EXIT_RECORDED' && count($accessRepo->currentlyInside($eventId))===0,'Venue exit did not clear live occupancy.');
+    $reentry=$scanner->checkin($issued['payload'],'usr_test','zone_vip');
+    expect(($reentry['allowed']??false)===true && ($accessRepo->currentOccupancy($eventId)['zone_vip']??0)===1,'Venue re-entry did not restore live occupancy.');
 
     // Session attendance.
     $sessionAccess=new SessionAccessService($credentials,$attendees,$orders,$sessionRepo,new SessionAttendanceRepository($store));
