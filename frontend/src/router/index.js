@@ -2,6 +2,7 @@ import { createRouter, createWebHistory } from 'vue-router'
 import AppShell from '../layouts/AppShell.vue'
 import AccessPage from '../pages/AccessPage.vue'
 import PublicEventPage from '../pages/PublicEventPage.vue'
+import PublicDiscoveryPage from '../pages/PublicDiscoveryPage.vue'
 import PublicConfirmationPage from '../pages/PublicConfirmationPage.vue'
 import DashboardPage from '../pages/DashboardPage.vue'
 import EventsPage from '../pages/EventsPage.vue'
@@ -30,6 +31,7 @@ export default createRouter({
   history:createWebHistory(import.meta.env.BASE_URL),
   routes:[
     {path:'/access',name:'access',component:AccessPage,meta:{public:true}},
+    {path:'/discover',name:'public-discover',component:PublicDiscoveryPage,meta:{public:true}},
     {path:'/e/:id',name:'public-event',component:PublicEventPage,meta:{public:true}},
     {path:'/events/:id/preview',name:'event-preview',component:PublicEventPage},
     {path:'/e/:id/confirmation/:token',name:'public-confirmation',component:PublicConfirmationPage,meta:{public:true}},
