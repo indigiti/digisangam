@@ -159,6 +159,7 @@ $publicFlow = static function () use ($store,$credentialSecret): RegistrationChe
         new NotificationOutbox($store),
         new CredentialService($credentialSecret()),
         new PaymentService(),
+        new MediaRepository($store),
     );
 };
 
@@ -363,6 +364,7 @@ try {
             header('Content-Type: '.(string)$media['mime']);
             header('Content-Length: '.(string)$media['size']);
             header('Cache-Control: public, max-age=86400');
+            header('X-Content-Type-Options: nosniff');
             readfile((string)$media['path']);
             exit;
         }
@@ -566,7 +568,7 @@ try {
     }
     if ($method === 'GET' && preg_match('#^/media/([^/]+)$#',$path,$m)) {
         $auth->requirePermission('media.view');$media=(new MediaRepository($store))->stream($m[1]);
-        header('Content-Type: '.(string)$media['mime']);header('Content-Length: '.(string)$media['size']);readfile((string)$media['path']);exit;
+        header('Content-Type: '.(string)$media['mime']);header('Content-Length: '.(string)$media['size']);header('X-Content-Type-Options: nosniff');header('Content-Disposition: inline; filename="'.addslashes((string)($media['name']??$media['id'])).'"');readfile((string)$media['path']);exit;
     }
 
     if ($method === 'GET' && $path === '/wallet-passes') {
