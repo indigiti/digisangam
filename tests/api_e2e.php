@@ -183,14 +183,20 @@ try{
         'website'=>'',
     ])['data'];
     if(($paidRegistration['order']['status']??'')!=='pending'||($paidRegistration['attendee']['status']??'')!=='Pending') fail('Manual paid registration should remain pending before settlement.',$paidRegistration);
+    $ticketsPending=request('GET','/api/v1/tickets?event_id='.rawurlencode($eventId))['data'];
+    $pendingPaidTicket=array_values(array_filter($ticketsPending,static fn(array $t): bool => ($t['id']??'')===($paidTicket['id']??'')))[0]??null;
+    if(!$pendingPaidTicket||($pendingPaidTicket['reserved']??0)!==1||($pendingPaidTicket['sold']??0)!==0) fail('Pending payment did not hold exactly one ticket reservation.',$ticketsPending);
     $paidOrderId=(string)$paidRegistration['order']['id'];
     $captured=request('POST','/api/v1/orders/'.rawurlencode($paidOrderId).'/capture',['payment_reference'=>'CASH-TEST-001'],$csrf)['data'];
     if(($captured['order']['status']??'')!=='paid'||($captured['attendee']['status']??'')!=='Confirmed') fail('Manual payment capture did not confirm attendee.',$captured);
+    $ticketsCaptured=request('GET','/api/v1/tickets?event_id='.rawurlencode($eventId))['data'];
+    $capturedPaidTicket=array_values(array_filter($ticketsCaptured,static fn(array $t): bool => ($t['id']??'')===($paidTicket['id']??'')))[0]??null;
+    if(!$capturedPaidTicket||($capturedPaidTicket['reserved']??-1)!==0||($capturedPaidTicket['sold']??-1)!==1) fail('Payment capture did not convert reservation into sold inventory.',$ticketsCaptured);
     $refunded=request('POST','/api/v1/orders/'.rawurlencode($paidOrderId).'/refund',['payment_reference'=>'REFUND-TEST-001'],$csrf)['data'];
     if(($refunded['order']['status']??'')!=='refunded'||($refunded['attendee']['status']??'')!=='Pending') fail('Manual refund did not revoke paid attendee state.',$refunded);
     $ticketsAfterRefund=request('GET','/api/v1/tickets?event_id='.rawurlencode($eventId))['data'];
     $refundedTicket=array_values(array_filter($ticketsAfterRefund,static fn(array $t): bool => ($t['id']??'')===($paidTicket['id']??'')))[0]??null;
-    if(!$refundedTicket||($refundedTicket['sold']??-1)!==0) fail('Refund did not release ticket inventory.',$ticketsAfterRefund);
+    if(!$refundedTicket||($refundedTicket['sold']??-1)!==0||($refundedTicket['reserved']??-1)!==0) fail('Refund did not release ticket inventory.',$ticketsAfterRefund);
 
     $inviteEvent=request('POST','/api/v1/events',[
         'name'=>'Invite Only Audit',
