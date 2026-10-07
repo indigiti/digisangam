@@ -59,6 +59,8 @@ use DigiSangam\Developer\WebhookRepository;
 use DigiSangam\Intelligence\EventBlueprintService;
 use DigiSangam\Media\MediaRepository;
 use DigiSangam\OnGround\WalkInRegistrationService;
+use DigiSangam\Operations\OperationsHealthService;
+use DigiSangam\Operations\WorkerHeartbeatRepository;
 use DigiSangam\Reports\OperationalReportService;
 use DigiSangam\Reports\ReportDefinitionRepository;
 use DigiSangam\Wallet\WalletPassRepository;
@@ -461,6 +463,11 @@ try {
             }
         }
         JsonResponse::send($result,!empty($result['allowed'])?200:422);
+    }
+
+    if ($method === 'GET' && $path === '/operations/health') {
+        $auth->requirePermission('workspace.view');
+        JsonResponse::send((new OperationsHealthService($store,new WorkerHeartbeatRepository($store)))->status());
     }
 
     if ($method === 'GET' && $path === '/workspace') {
