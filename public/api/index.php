@@ -170,6 +170,7 @@ $paymentCapture = static function () use ($store,$journal): PaymentCaptureServic
         new RegistrationRepository($store),
         new NotificationOutbox($store),
         $journal,
+        new TicketRepository($store),
     );
 };
 
@@ -947,8 +948,11 @@ try {
         $input['status']=((int)($input['amount']??0)===0)?'paid':'pending';
         try{
             $order=$orders->create($input);
+            if($reservedTicket && ($order['status']??'')==='paid'){
+                $reservedTicket=(new TicketRepository($store))->commitReservation($ticketId,(string)$event['id']);
+            }
         }catch(Throwable $e){
-            if($reservedTicket) (new TicketRepository($store))->releaseOne($ticketId,(string)$event['id']);
+            if($reservedTicket) (new TicketRepository($store))->releaseReservation($ticketId,(string)$event['id']);
             throw $e;
         }
         $journal->append('order.created',['order_id'=>$order['id'],'amount'=>$order['amount'],'event_id'=>$order['event_id']]);
@@ -993,7 +997,7 @@ try {
             $attendee=(new AttendeeRepository($store))->update((string)$order['attendee_id'],['status'=>'Pending']);
         }
         if(!empty($order['ticket_id'])){
-            (new TicketRepository($store))->releaseOne((string)$order['ticket_id'],(string)$order['event_id']);
+            (new TicketRepository($store))->releaseSold((string)$order['ticket_id'],(string)$order['event_id']);
         }
         $journal->append('payment.refunded',['order_id'=>$order['id'],'event_id'=>$order['event_id'],'payment_reference'=>$reference]);
         JsonResponse::send(['order'=>$order,'attendee'=>$attendee]);
