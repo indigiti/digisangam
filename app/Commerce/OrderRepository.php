@@ -7,73 +7,63 @@ use DigiSangam\Core\Storage\JsonFileStore;
 
 final class OrderRepository
 {
+    private const PATH='orders/index.json';
+    private const STATUSES=['pending','paid','failed','refunded','expired','cancelled'];
+
     public function __construct(private readonly JsonFileStore $store) {}
 
-    public function all(): array
-    {
-        return $this->store->read('orders/index.json', []);
-    }
-
-    public function find(string $id): ?array
-    {
-        foreach($this->all() as $row) if(($row['id']??'')===$id) return $row;
-        return null;
-    }
-
-    public function findByProviderOrderId(string $providerOrderId): ?array
-    {
-        if($providerOrderId==='') return null;
-        foreach($this->all() as $row) if(($row['provider_order_id']??'')===$providerOrderId) return $row;
-        return null;
-    }
-
-    public function findLatestByAttendee(string $attendeeId): ?array
-    {
-        foreach($this->all() as $row) if(($row['attendee_id']??'')===$attendeeId) return $row;
-        return null;
-    }
+    public function all(): array { return $this->store->read(self::PATH,[]); }
+    public function find(string $id): ?array { foreach($this->all() as $row)if(($row['id']??'')===$id)return $row;return null; }
+    public function findByProviderOrderId(string $providerOrderId): ?array { if($providerOrderId==='')return null;foreach($this->all() as $row)if(($row['provider_order_id']??'')===$providerOrderId)return $row;return null; }
+    public function findLatestByAttendee(string $attendeeId): ?array { foreach($this->all() as $row)if(($row['attendee_id']??'')===$attendeeId)return $row;return null; }
 
     public function create(array $input): array
     {
-        $rows = $this->all();
-        $amount = max(0, (int)($input['amount'] ?? 0));
-        $record = [
+        $eventId=trim((string)($input['event_id']??''));
+        $status=(string)($input['status']??'pending');
+        if($eventId==='') throw new \InvalidArgumentException('Event is required.');
+        if(!in_array($status,self::STATUSES,true)) throw new \InvalidArgumentException('Invalid order status.');
+        $record=[
             'id'=>'ord_'.date('Ymd').'_'.bin2hex(random_bytes(4)),
-            'event_id'=>trim((string)($input['event_id'] ?? '')),
-            'attendee_id'=>(string)($input['attendee_id'] ?? ''),
-            'ticket_id'=>(string)($input['ticket_id'] ?? ''),
-            'amount'=>$amount,
-            'currency'=>strtoupper((string)($input['currency'] ?? 'INR')),
-            'status'=>(string)($input['status'] ?? 'pending'),
-            'payment_reference'=>(string)($input['payment_reference'] ?? ''),
-            'provider'=>(string)($input['provider'] ?? ''),
-            'provider_order_id'=>(string)($input['provider_order_id'] ?? ''),
+            'event_id'=>$eventId,'attendee_id'=>(string)($input['attendee_id']??''),
+            'ticket_id'=>(string)($input['ticket_id']??''),
+            'amount'=>max(0,(int)($input['amount']??0)),
+            'currency'=>strtoupper((string)($input['currency']??'INR')),
+            'status'=>$status,'payment_reference'=>(string)($input['payment_reference']??''),
+            'provider'=>(string)($input['provider']??''),
+            'provider_order_id'=>(string)($input['provider_order_id']??''),
+            'reservation_expires_at'=>(string)($input['reservation_expires_at']??''),
             'created_at'=>date(DATE_ATOM),
         ];
-        if($record['event_id']==='') throw new \InvalidArgumentException('Event is required.');
-        if(!in_array($record['status'],['pending','paid','failed','refunded'],true)) throw new \InvalidArgumentException('Invalid order status.');
-        array_unshift($rows, $record);
-        $this->store->write('orders/index.json', $rows);
-        return $record;
+        return $this->store->transaction(self::PATH,static function(array $rows) use ($record): array {
+            array_unshift($rows,$record);return ['data'=>$rows,'result'=>$record];
+        },[]);
     }
 
-    public function updatePayment(string $id, array $payment): ?array
+    public function updatePayment(string $id,array $payment): ?array
     {
-        $rows=$this->all(); $updated=null;
-        foreach($rows as &$row){
-            if(($row['id']??'')!==$id) continue;
-            $nextStatus=(string)($payment['status'] ?? $row['status']);
-            if(!in_array($nextStatus,['pending','paid','failed','refunded'],true)) throw new \InvalidArgumentException('Invalid payment status.');
-            $row['status']=$nextStatus;
-            $row['payment_reference']=(string)($payment['payment_reference'] ?? $row['payment_reference']);
-            $row['provider']=(string)($payment['provider'] ?? $row['provider']);
-            if(isset($payment['provider_order_id'])) $row['provider_order_id']=(string)$payment['provider_order_id'];
-            $row['updated_at']=date(DATE_ATOM);
-            $updated=$row;
-            break;
-        }
-        unset($row);
-        if($updated!==null) $this->store->write('orders/index.json',$rows);
-        return $updated;
+        return $this->store->transaction(self::PATH,static function(array $rows) use ($id,$payment): array {
+            $updated=null;
+            foreach($rows as &$row){
+                if(($row['id']??'')!==$id)continue;
+                $nextStatus=(string)($payment['status']??$row['status']);
+                if(!in_array($nextStatus,self::STATUSES,true)) throw new \InvalidArgumentException('Invalid payment status.');
+                $row['status']=$nextStatus;
+                foreach(['payment_reference','provider','provider_order_id','reservation_expires_at'] as $field){
+                    if(array_key_exists($field,$payment))$row[$field]=(string)$payment[$field];
+                }
+                $row['updated_at']=date(DATE_ATOM);$updated=$row;break;
+            }
+            unset($row);
+            return ['data'=>$rows,'result'=>$updated];
+        },[]);
+    }
+
+    public function delete(string $id): bool
+    {
+        return $this->store->transaction(self::PATH,static function(array $rows) use ($id): array {
+            $next=array_values(array_filter($rows,static fn(array $row): bool => ($row['id']??'')!==$id));
+            return ['data'=>$next,'result'=>count($next)!==count($rows)];
+        },[]);
     }
 }
