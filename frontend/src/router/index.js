@@ -15,6 +15,7 @@ import CommercePage from '../pages/CommercePage.vue'
 import AnalyticsPage from '../pages/AnalyticsPage.vue'
 import IntelligencePage from '../pages/IntelligencePage.vue'
 import OnGroundPage from '../pages/OnGroundPage.vue'
+import EntryMonitorPage from '../pages/EntryMonitorPage.vue'
 import CommunicationPage from '../pages/CommunicationPage.vue'
 import AutomationPage from '../pages/AutomationPage.vue'
 import BadgesPage from '../pages/BadgesPage.vue'
@@ -50,6 +51,7 @@ export default createRouter({
       {path:'exhibitors',name:'exhibitors',component:ExhibitorsPage},
       {path:'venue',name:'venue',component:VenuePage},
       {path:'onground',name:'onground',component:OnGroundPage},
+      {path:'entry-monitor',name:'entry-monitor',component:EntryMonitorPage},
       {path:'accreditation',name:'accreditation',component:AccreditationPage},
       {path:'commerce',name:'commerce',component:CommercePage},
       {path:'analytics',name:'analytics',component:AnalyticsPage},
