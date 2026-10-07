@@ -383,7 +383,7 @@ try {
             (new PublicRequestGuard($store))->enforce('media-upload:'.$m[1],20,600);
             $publicFlow()->publicEvent($m[1]);
             if(empty($_FILES['file'])) JsonResponse::send(['error'=>'File is required.'],422);
-            $record=(new MediaRepository($store))->saveUpload($_FILES['file'],$m[1],(string)($_POST['kind']??'registration_file'),false);
+            $record=(new MediaRepository($store))->saveUpload($_FILES['file'],$m[1],'registration_file',false);
             JsonResponse::send($record,201);
         }
 
