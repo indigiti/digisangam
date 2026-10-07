@@ -83,7 +83,7 @@ final class RegistrationCheckoutService
         if ($this->attendees->findByEmailForEvent($email,$eventId)) throw new \InvalidArgumentException('This email is already registered for the event.');
 
         $approvalMode = (string)($schema['approval_mode'] ?? 'auto');
-        if ($approvalMode === 'invite_only') $this->assertInvitation($email,$eventId);
+        if ($approvalMode === 'invite_only') $this->assertInvitation($email,$eventId,trim((string)($input['invitation_token']??'')));
 
         $ticketId = trim((string)($input['ticket_id'] ?? ''));
         if ($ticketId === '') throw new \InvalidArgumentException('Please select a ticket.');
@@ -112,6 +112,9 @@ final class RegistrationCheckoutService
 
             if (($payment['status'] ?? '') === 'paid' && $approvalMode !== 'manual') {
                 $attendee = $this->attendees->update((string)$attendee['id'],['status'=>'Confirmed']) ?? $attendee;
+            }
+            if($approvalMode==='invite_only'){
+                $this->invitations->markAccepted(trim((string)($input['invitation_token']??'')));
             }
         } catch (\Throwable $e) {
             if ($attendee !== null) $this->attendees->delete((string)$attendee['id']);
@@ -231,12 +234,18 @@ final class RegistrationCheckoutService
         };
     }
 
-    private function assertInvitation(string $email,string $eventId): void
+    private function assertInvitation(string $email,string $eventId,string $token): void
     {
-        foreach ($this->invitations->all() as $invite) {
-            if (($invite['event_id']??'')===$eventId && strtolower((string)($invite['email'] ?? '')) === $email && ($invite['status'] ?? 'pending') !== 'revoked') return;
+        if($token==='') throw new \InvalidArgumentException('This event requires an invitation link.');
+        $invite=$this->invitations->findByToken($token);
+        if(
+            !$invite ||
+            ($invite['event_id']??'')!==$eventId ||
+            strtolower((string)($invite['email']??''))!==$email ||
+            in_array(($invite['status']??'pending'),['revoked','accepted'],true)
+        ){
+            throw new \InvalidArgumentException('This invitation is invalid, expired or already used.');
         }
-        throw new \InvalidArgumentException('This event requires a valid invitation.');
     }
 
     private function publicAttendee(array $attendee): array
