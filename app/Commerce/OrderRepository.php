@@ -8,7 +8,7 @@ use DigiSangam\Core\Storage\JsonFileStore;
 final class OrderRepository
 {
     private const PATH='orders/index.json';
-    private const STATUSES=['pending','paid','failed','refunded','expired','cancelled'];
+    private const STATUSES=['pending','capturing','paid','failed','refunded','expired','cancelled'];
 
     public function __construct(private readonly JsonFileStore $store) {}
 
@@ -52,6 +52,23 @@ final class OrderRepository
                 foreach(['payment_reference','provider','provider_order_id','reservation_expires_at'] as $field){
                     if(array_key_exists($field,$payment))$row[$field]=(string)$payment[$field];
                 }
+                $row['updated_at']=date(DATE_ATOM);$updated=$row;break;
+            }
+            unset($row);
+            return ['data'=>$rows,'result'=>$updated];
+        },[]);
+    }
+
+    public function transitionStatus(string $id,array $from,string $to,array $meta=[]): ?array
+    {
+        if(!in_array($to,self::STATUSES,true)) throw new \InvalidArgumentException('Invalid order status.');
+        return $this->store->transaction(self::PATH,static function(array $rows) use ($id,$from,$to,$meta): array {
+            $updated=null;
+            foreach($rows as &$row){
+                if(($row['id']??'')!==$id)continue;
+                if(!in_array((string)($row['status']??''),$from,true))break;
+                $row['status']=$to;
+                foreach($meta as $field=>$value)$row[$field]=$value;
                 $row['updated_at']=date(DATE_ATOM);$updated=$row;break;
             }
             unset($row);
