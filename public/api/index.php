@@ -336,6 +336,11 @@ try {
             JsonResponse::send($result);
         }
 
+        if ($method === 'POST' && preg_match('#^/public/confirmations/([a-f0-9]{32,})/retry-payment$#',$path,$m)) {
+            (new PublicRequestGuard($store))->enforce('payment-retry:'.$m[1],6,600);
+            JsonResponse::send($publicFlow()->retryPayment($m[1]),201);
+        }
+
         if ($method === 'GET' && preg_match('#^/public/confirmations/([a-f0-9]{32,})$#',$path,$m)) {
             $result=$publicFlow()->confirmation($m[1]);
             $result['receipt']=(new ReceiptService())->build(
