@@ -11,6 +11,8 @@ final class InvitationRepository
 
     public function __construct(private readonly JsonFileStore $store) {}
     public function all(): array { return $this->store->read(self::PATH,[]); }
+    public function find(string $id): ?array { foreach($this->all() as $row)if(($row['id']??'')===$id)return $row;return null; }
+
     public function findByToken(string $token): ?array { foreach($this->all() as $row)if(($row['token']??'')===$token)return $row;return null; }
 
     public function create(array $input): array
@@ -42,6 +44,20 @@ final class InvitationRepository
             foreach($rows as &$row){
                 if(($row['id']??'')!==$id)continue;
                 if(($row['status']??'')!=='revoked'){$row['status']='revoked';$row['revoked_at']=date(DATE_ATOM);}
+                $updated=$row;break;
+            }
+            unset($row);return ['data'=>$rows,'result'=>$updated];
+        },[]);
+    }
+
+    public function markSent(string $id,string $messageId): ?array
+    {
+        return $this->store->transaction(self::PATH,static function(array $rows) use ($id,$messageId): array {
+            $updated=null;
+            foreach($rows as &$row){
+                if(($row['id']??'')!==$id)continue;
+                $row['notification_message_id']=$messageId;
+                $row['queued_at']=date(DATE_ATOM);
                 $updated=$row;break;
             }
             unset($row);return ['data'=>$rows,'result'=>$updated];
