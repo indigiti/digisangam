@@ -147,8 +147,15 @@ try{
     if(empty($verified['allowed'])) fail('Scanner verify rejected valid credential.',$verified);
     $checkin=request('POST','/api/v1/scanner/checkin',['payload'=>$credential],$csrf)['data'];
     if(empty($checkin['allowed'])||!empty($checkin['already_checked_in'])) fail('First check-in failed.',$checkin);
+    $live=request('GET','/api/v1/onground/live?event_id='.rawurlencode($eventId))['data'];
+    if(($live['currently_inside']??0)!==1) fail('Live entry monitor did not show checked-in visitor.',$live);
     $duplicate=request('POST','/api/v1/scanner/checkin',['payload'=>$credential],$csrf)['data'];
     if(empty($duplicate['already_checked_in'])) fail('Duplicate check-in not detected.',$duplicate);
+    $exit=request('POST','/api/v1/scanner/exit',['payload'=>$credential],$csrf)['data'];
+    if(($exit['reason']??'')!=='EXIT_RECORDED') fail('Venue exit was not recorded.',$exit);
+    $liveAfterExit=request('GET','/api/v1/onground/live?event_id='.rawurlencode($eventId))['data'];
+    if(($liveAfterExit['currently_inside']??-1)!==0) fail('Live entry monitor did not clear exited visitor.',$liveAfterExit);
+    request('POST','/api/v1/scanner/checkin',['payload'=>$credential],$csrf);
 
     $dashboard=request('GET','/api/v1/dashboard?event_id='.rawurlencode($eventId))['data'];
     if(($dashboard['metrics']['registrations']??0)!==1) fail('Dashboard registration metric incorrect.',$dashboard);
@@ -181,6 +188,40 @@ try{
     if(($captured['order']['status']??'')!=='paid'||($captured['attendee']['status']??'')!=='Confirmed') fail('Manual payment capture did not confirm attendee.',$captured);
     $refunded=request('POST','/api/v1/orders/'.rawurlencode($paidOrderId).'/refund',['payment_reference'=>'REFUND-TEST-001'],$csrf)['data'];
     if(($refunded['order']['status']??'')!=='refunded'||($refunded['attendee']['status']??'')!=='Pending') fail('Manual refund did not revoke paid attendee state.',$refunded);
+    $ticketsAfterRefund=request('GET','/api/v1/tickets?event_id='.rawurlencode($eventId))['data'];
+    $refundedTicket=array_values(array_filter($ticketsAfterRefund,static fn(array $t): bool => ($t['id']??'')===($paidTicket['id']??'')))[0]??null;
+    if(!$refundedTicket||($refundedTicket['sold']??-1)!==0) fail('Refund did not release ticket inventory.',$ticketsAfterRefund);
+
+    $inviteEvent=request('POST','/api/v1/events',[
+        'name'=>'Invite Only Audit',
+        'start_date'=>'2027-02-20',
+        'end_date'=>'2027-02-20',
+        'location'=>'Pune, India',
+        'privacy'=>'public',
+        'registration'=>['title'=>'Invite Registration','approval_mode'=>'invite_only','categories'=>['General']],
+        'ticket'=>['enabled'=>true,'name'=>'Invite Pass','price'=>0,'quantity'=>5],
+    ],$csrf)['data'];
+    $inviteEventId=(string)$inviteEvent['id'];
+    request('PATCH','/api/v1/events/'.rawurlencode($inviteEventId),['status'=>'Published'],$csrf);
+    $invite=request('POST','/api/v1/invitations',[
+        'event_id'=>$inviteEventId,'email'=>'invite-http@example.test','category'=>'General',
+    ],$csrf)['data'];
+    $invitePublic=request('GET','/api/v1/public/invitations/'.rawurlencode((string)$invite['token']))['data'];
+    if(($invitePublic['email']??'')!=='invite-http@example.test') fail('Public invitation validation failed.',$invitePublic);
+    $inviteTickets=request('GET','/api/v1/tickets?event_id='.rawurlencode($inviteEventId))['data'];
+    $inviteRegistration=request('POST','/api/v1/public/events/'.rawurlencode($inviteEventId).'/register',[
+        'ticket_id'=>$inviteTickets[0]['id'],
+        'invitation_token'=>$invite['token'],
+        'answers'=>[
+            'fld_name'=>'Invited HTTP User',
+            'fld_email'=>'invite-http@example.test',
+            'fld_category'=>'General',
+        ],
+        'website'=>'',
+    ])['data'];
+    if(($inviteRegistration['attendee']['status']??'')!=='Confirmed') fail('Invitation registration did not confirm attendee.',$inviteRegistration);
+    $inviteRows=request('GET','/api/v1/invitations?event_id='.rawurlencode($inviteEventId))['data'];
+    if(($inviteRows[0]['status']??'')!=='accepted') fail('Invitation was not marked accepted.',$inviteRows);
 
     $event2=request('POST','/api/v1/events',[
         'name'=>'Isolation Event',
