@@ -110,6 +110,7 @@ export const api={
   venue:(eventId)=>request('/venue/'+encodeURIComponent(eventId)),
   seatAssignments:(eventId)=>request('/venue/'+encodeURIComponent(eventId)+'/seats'),
   assignSeat:(eventId,payload)=>request('/venue/'+encodeURIComponent(eventId)+'/seats',{method:'POST',body:JSON.stringify(payload)}),
+  unassignSeat:(eventId,id)=>request('/venue/'+encodeURIComponent(eventId)+'/seats/'+encodeURIComponent(id),{method:'DELETE'}),
   updateVenue:(eventId,payload)=>request('/venue/'+encodeURIComponent(eventId),{method:'PATCH',body:JSON.stringify(payload)}),
   tickets:(eventId='')=>request('/tickets'+(eventId?'?event_id='+encodeURIComponent(eventId):'')),
   createTicket:(payload)=>request('/tickets',{method:'POST',body:JSON.stringify(payload)}),
