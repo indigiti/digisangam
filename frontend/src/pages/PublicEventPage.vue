@@ -11,6 +11,7 @@ const answers=reactive({}),honeypot=ref(''),uploadingField=ref('')
 const money=n=>Number(n||0)===0?'Free':new Intl.NumberFormat('en-IN',{style:'currency',currency:data.value?.event?.currency||'INR',maximumFractionDigits:0}).format(n)
 const selected=computed(()=>data.value?.tickets?.find(x=>x.id===selectedTicket.value)||null)
 const fields=computed(()=>data.value?.registration?.fields||[])
+const startingPrice=computed(()=>{const prices=(data.value?.tickets||[]).map(t=>Number(t.price||0));return prices.length?Math.min(...prices):0})
 
 onMounted(async()=>{
   try{
@@ -38,6 +39,7 @@ function visible(field){
   if(field.condition.operator==='contains') return Array.isArray(source)?source.includes(field.condition.value):String(source||'').includes(field.condition.value)
   return source===field.condition.value
 }
+function scrollToRegistration(){document.getElementById('registration-flow')?.scrollIntoView({behavior:'smooth'})}
 function next(){
   error.value=''
   if(step.value===1&&!selectedTicket.value){error.value='Please select a ticket to continue.';return}
@@ -138,7 +140,7 @@ async function submit(){
           <h1 class="mt-4 text-3xl font-black tracking-tight sm:text-5xl">{{data.event.public_page?.headline||data.event.name}}</h1>
           <p class="mt-4 max-w-3xl text-sm leading-6 text-slate-300 sm:text-base">{{data.event.description||'Discover this event and register securely with DigiSangam.'}}</p>
           <div class="mt-6 flex flex-wrap gap-x-6 gap-y-3 text-sm font-semibold text-slate-200"><span>◷ {{data.event.start_date||data.event.date}}{{data.event.end_date&&data.event.end_date!==data.event.start_date?' – '+data.event.end_date:''}}</span><span>⌖ {{data.event.venue_name||data.event.location||'Venue TBA'}}</span><span>◎ {{data.registration.approval_mode==='manual'?'Approval required':data.registration.approval_mode==='invite_only'?'Invite only':'Instant confirmation'}}</span></div>
-          <div class="mt-7 flex flex-wrap items-center gap-4"><button class="rounded-xl bg-[#f84464] px-6 py-3 text-sm font-black text-white shadow-lg shadow-rose-950/20" @click="document.getElementById('registration-flow')?.scrollIntoView({behavior:'smooth'})">Register now</button><span class="text-sm text-slate-400">From <b class="text-lg text-white">{{money(Math.min(...data.tickets.map(t=>Number(t.price||0))),data.event.currency)}}</b></span></div>
+          <div class="mt-7 flex flex-wrap items-center gap-4"><button class="rounded-xl bg-[#f84464] px-6 py-3 text-sm font-black text-white shadow-lg shadow-rose-950/20" @click="scrollToRegistration">Register now</button><span class="text-sm text-slate-400">From <b class="text-lg text-white">{{money(startingPrice,data.event.currency)}}</b></span></div>
         </div>
       </div>
     </section>
@@ -185,7 +187,7 @@ async function submit(){
     </section>
 
     <div class="fixed inset-x-0 bottom-0 z-40 border-t border-slate-200 bg-white/95 p-3 backdrop-blur lg:hidden">
-      <div class="mx-auto flex max-w-lg items-center justify-between gap-3"><div><p class="text-[10px] font-bold uppercase text-slate-400">{{selected?'Selected ticket':'Tickets from'}}</p><p class="text-sm font-black">{{selected?selected.name:money(Math.min(...data.tickets.map(t=>Number(t.price||0))),data.event.currency)}}</p></div><button class="rounded-xl bg-[#f84464] px-5 py-3 text-sm font-black text-white" @click="document.getElementById('registration-flow')?.scrollIntoView({behavior:'smooth'})">{{selected?'Continue booking':'View tickets'}}</button></div>
+      <div class="mx-auto flex max-w-lg items-center justify-between gap-3"><div><p class="text-[10px] font-bold uppercase text-slate-400">{{selected?'Selected ticket':'Tickets from'}}</p><p class="text-sm font-black">{{selected?selected.name:money(Math.min(...data.tickets.map(t=>Number(t.price||0))),data.event.currency)}}</p></div><button class="rounded-xl bg-[#f84464] px-5 py-3 text-sm font-black text-white" @click="scrollToRegistration">{{selected?'Continue booking':'View tickets'}}</button></div>
     </div>
   </template>
 </main>
