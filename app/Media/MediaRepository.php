@@ -68,10 +68,25 @@ final class MediaRepository
     public function publicView(array $row): array
     {
         $copy=$row;unset($copy['path']);
-        $base=rtrim(trim((string)getenv('APP_URL')),'/');
+        $base=$this->publicBaseUrl();
         $relative='api/v1/public/media/'.rawurlencode((string)$row['id']);
-        $copy['url']=$base!==''?$base.'/'.$relative:$relative;
+        $copy['url']=rtrim($base,'/').'/'.$relative;
         return $copy;
+    }
+
+    private function publicBaseUrl(): string
+    {
+        $configured=rtrim(trim((string)getenv('APP_URL')),'/');
+        if($configured!=='') return $configured;
+
+        $script=str_replace('\\\\','/',(string)($_SERVER['SCRIPT_NAME']??''));
+        if($script!=='' && preg_match('#^(.*?)/api(?:/index\\.php)?$#',$script,$match)){
+            $base=rtrim((string)($match[1]??''),'/');
+            return $base!==''?$base:'/';
+        }
+
+        // DigiOps production contract deploys the public app under /digisangam/.
+        return '/digisangam';
     }
 
     public function stream(string $id): array
