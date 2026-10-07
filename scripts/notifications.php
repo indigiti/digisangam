@@ -2,6 +2,7 @@
 declare(strict_types=1);
 
 use DigiSangam\Core\Storage\JsonFileStore;
+use DigiSangam\Operations\WorkerHeartbeatRepository;
 use DigiSangam\Communications\CampaignRepository;
 use DigiSangam\Notifications\NotificationOutbox;
 use DigiSangam\Notifications\NotificationProviderFactory;
@@ -20,5 +21,6 @@ $worker=new NotificationWorker(
     NotificationProviderFactory::sms(),
 );
 $result=$worker->run((int)($argv[1]??25));
+(new WorkerHeartbeatRepository($store))->beat('notifications',$result,300);
 fwrite(STDOUT,json_encode($result,JSON_PRETTY_PRINT|JSON_UNESCAPED_SLASHES).PHP_EOL);
 exit($result['failed']>0?2:0);
