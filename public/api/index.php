@@ -597,6 +597,19 @@ try {
     if ($method === 'POST' && preg_match('#^/developer/keys/([^/]+)/revoke$#',$path,$m)) {
         $auth->requirePermission('developer.manage');$row=(new ApiKeyRepository($store))->revoke($m[1]);JsonResponse::send($row??['error'=>'API key not found.'],$row?200:404);
     }
+    if ($method === 'GET' && $path === '/developer/webhook-deliveries') {
+        $auth->requirePermission('developer.view');
+        $eventId=trim((string)($_GET['event_id']??''));
+        $rows=(new WebhookOutboxRepository($store))->all();
+        if($eventId!=='') $rows=array_values(array_filter($rows,static fn(array $row): bool => (string)($row['data']['event_id']??'')===$eventId));
+        $rows=array_slice($rows,0,100);
+        $safe=array_map(static function(array $row): array {
+            unset($row['secret']);
+            return $row;
+        },$rows);
+        JsonResponse::send($safe);
+    }
+
     if ($method === 'GET' && $path === '/developer/webhooks') {
         $auth->requirePermission('developer.view');JsonResponse::send($forEvent((new WebhookRepository($store))->publicList(),$eventQuery));
     }
