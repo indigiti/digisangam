@@ -845,6 +845,11 @@ try {
         $auth->requirePermission('attendees.view');
         $record=$attendees->find($m[1]);
         if(!$record) JsonResponse::send(['error'=>'Attendee not found.'],404);
+        if(($record['status']??'')!=='Confirmed') throw new RuntimeException('Credential is available only for confirmed attendees.');
+        $latestOrder=(new OrderRepository($store))->findLatestByAttendee((string)$record['id']);
+        if($latestOrder && (int)($latestOrder['amount']??0)>0 && ($latestOrder['status']??'')!=='paid'){
+            throw new RuntimeException('Credential cannot be issued until the paid ticket order is settled.');
+        }
         JsonResponse::send((new CredentialService($credentialSecret()))->issue((string)$record['id'],(string)($record['event_id'] ?? '')));
     }
     if (preg_match('#^/attendees/([^/]+)$#',$path,$m)) {
@@ -857,7 +862,14 @@ try {
         if(in_array($method,['PUT','PATCH'],true)) {
             $auth->requirePermission('attendees.manage');
             $before=$attendees->find($id);
-            $record=$attendees->update($id,$body());
+            $updateInput=$body();
+            if(($updateInput['status']??'')==='Confirmed'){
+                $latestOrder=(new OrderRepository($store))->findLatestByAttendee($id);
+                if($latestOrder && (int)($latestOrder['amount']??0)>0 && ($latestOrder['status']??'')!=='paid'){
+                    throw new RuntimeException('Paid ticket order must be settled before attendee confirmation.');
+                }
+            }
+            $record=$attendees->update($id,$updateInput);
             if(!$record) JsonResponse::send(['error'=>'Attendee not found.'],404);
             $journal->append('attendee.updated',['attendee_id'=>$id,'status'=>$record['status'] ?? null]);
             if(($before['status'] ?? '')!=='Confirmed' && ($record['status'] ?? '')==='Confirmed') $automation()->fire('attendee.confirmed',$record);
@@ -908,14 +920,22 @@ try {
             if(!$attendee || ($attendee['event_id']??'')!==$event['id']) throw new InvalidArgumentException('Attendee does not belong to this event.');
         }
         $ticketId=trim((string)($input['ticket_id']??''));
+        $reservedTicket=null;
         if($ticketId!==''){
             $ticket=(new TicketRepository($store))->find($ticketId);
             if(!$ticket || ($ticket['event_id']??'')!==$event['id']) throw new InvalidArgumentException('Ticket does not belong to this event.');
+            $reservedTicket=(new TicketRepository($store))->reserveOne($ticketId,(string)$event['id']);
+            $input['amount']=(int)($reservedTicket['price']??0);
         }
-        $input['currency']=strtoupper((string)($input['currency']??$event['currency']??'INR'));
+        $input['currency']=strtoupper((string)($event['currency']??'INR'));
         $input['provider']='manual';
         $input['status']=((int)($input['amount']??0)===0)?'paid':'pending';
-        $order=$orders->create($input);
+        try{
+            $order=$orders->create($input);
+        }catch(Throwable $e){
+            if($reservedTicket) (new TicketRepository($store))->releaseOne($ticketId,(string)$event['id']);
+            throw $e;
+        }
         $journal->append('order.created',['order_id'=>$order['id'],'amount'=>$order['amount'],'event_id'=>$order['event_id']]);
         JsonResponse::send($order,201);
     }
@@ -956,6 +976,9 @@ try {
         $attendee=null;
         if(!empty($order['attendee_id'])){
             $attendee=(new AttendeeRepository($store))->update((string)$order['attendee_id'],['status'=>'Pending']);
+        }
+        if(!empty($order['ticket_id'])){
+            (new TicketRepository($store))->releaseOne((string)$order['ticket_id'],(string)$order['event_id']);
         }
         $journal->append('payment.refunded',['order_id'=>$order['id'],'event_id'=>$order['event_id'],'payment_reference'=>$reference]);
         JsonResponse::send(['order'=>$order,'attendee'=>$attendee]);
