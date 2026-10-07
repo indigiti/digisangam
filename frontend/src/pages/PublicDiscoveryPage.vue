@@ -156,7 +156,7 @@ function reset(){query.value='';category.value='All';location.value='All';dateFi
       <div v-if="topPicks.length" class="-mx-4 flex gap-4 overflow-x-auto px-4 pb-3 sm:mx-0 sm:grid sm:grid-cols-3 sm:overflow-visible sm:px-0 lg:grid-cols-5">
         <RouterLink v-for="event in topPicks" :key="event.id" :to="'/e/'+event.id" class="group w-[170px] shrink-0 sm:w-auto">
           <div class="relative aspect-[2/3] overflow-hidden rounded-[12px] bg-[#e7e7e9] shadow-sm">
-            <img v-if="event.branding?.cover_url" :src="event.branding.cover_url" :alt="event.name" class="h-full w-full object-cover transition duration-500 group-hover:scale-[1.03]"/>
+            <img v-if="event.branding?.poster_url||event.branding?.cover_url" :src="event.branding?.poster_url||event.branding?.cover_url" :alt="event.name" class="h-full w-full object-cover transition duration-500 group-hover:scale-[1.03]"/>
             <div v-else class="h-full w-full" :style="{background:gradient(event)}"></div>
             <div class="absolute inset-0 bg-gradient-to-t from-black/55 via-transparent to-transparent"></div>
             <div class="absolute bottom-0 left-0 right-0 flex items-center justify-between p-3 text-white"><span class="rounded bg-black/45 px-2 py-1 text-[9px] font-bold backdrop-blur">{{event.category}}</span><span class="text-[10px] font-bold">{{fmtDate(event.start_date)}}</span></div>
@@ -177,7 +177,7 @@ function reset(){query.value='';category.value='All';location.value='All';dateFi
         <div class="mb-5"><h2 class="text-[22px] font-black tracking-[-.025em]">More experiences</h2><p class="mt-1 text-[12px] text-slate-500">More events available on DigiSangam.</p></div>
         <div class="grid gap-x-4 gap-y-7 sm:grid-cols-3 lg:grid-cols-5">
           <RouterLink v-for="event in remaining" :key="event.id" :to="'/e/'+event.id" class="group">
-            <div class="relative aspect-[2/3] overflow-hidden rounded-[12px] bg-slate-100"><img v-if="event.branding?.cover_url" :src="event.branding.cover_url" class="h-full w-full object-cover"/><div v-else class="h-full" :style="{background:gradient(event)}"></div></div>
+            <div class="relative aspect-[2/3] overflow-hidden rounded-[12px] bg-slate-100"><img v-if="event.branding?.poster_url||event.branding?.cover_url" :src="event.branding?.poster_url||event.branding?.cover_url" class="h-full w-full object-cover"/><div v-else class="h-full" :style="{background:gradient(event)}"></div></div>
             <h3 class="mt-3 line-clamp-2 text-[14px] font-black leading-[1.35] group-hover:text-[#f84464]">{{event.name}}</h3><p class="mt-1 text-[11px] text-slate-500">{{fullDate(event.start_date)}}</p><p class="mt-1 truncate text-[11px] text-slate-400">{{event.location||'Location TBA'}}</p>
           </RouterLink>
         </div>
