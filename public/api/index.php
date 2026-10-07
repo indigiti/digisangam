@@ -608,6 +608,19 @@ try {
     if ($method === 'GET' && $path === '/wallet-passes') {
         $auth->requirePermission('wallet.view');JsonResponse::send($forEvent((new WalletPassRepository($store))->all(),$eventQuery));
     }
+    if ($method === 'POST' && $path === '/wallet-passes') {
+        $auth->requirePermission('wallet.manage');
+        $input=$body();$eventId=trim((string)($input['event_id']??''));$event=$requireEvent($eventId);
+        $attendee=(new AttendeeRepository($store))->find((string)($input['attendee_id']??''));
+        if(!$attendee||($attendee['event_id']??'')!==$eventId) throw new InvalidArgumentException('Attendee does not belong to this event.');
+        if(($attendee['status']??'')!=='Confirmed') throw new RuntimeException('Wallet pass is available only for confirmed attendees.');
+        $latestOrder=(new OrderRepository($store))->findLatestByAttendee((string)$attendee['id']);
+        if($latestOrder&&(int)($latestOrder['amount']??0)>0&&($latestOrder['status']??'')!=='paid') throw new RuntimeException('Paid ticket order must be settled before wallet issuance.');
+        $credential=(new CredentialService($credentialSecret()))->issue((string)$attendee['id'],$eventId);
+        $pass=(new WalletPassService(new WalletPassRepository($store),$credentialSecret()))->issue($event,$attendee,(string)$credential['payload'],(string)($input['platform']??'google'));
+        $journal->append('wallet.pass_issued',['event_id'=>$eventId,'attendee_id'=>$attendee['id'],'wallet_pass_id'=>$pass['id'],'platform'=>$pass['platform']]);
+        JsonResponse::send($pass,201);
+    }
 
     if ($method === 'GET' && $path === '/credential-bindings') {
         $auth->requirePermission('credentials.view');JsonResponse::send($forEvent((new CredentialBindingRepository($store))->all(),$eventQuery));
