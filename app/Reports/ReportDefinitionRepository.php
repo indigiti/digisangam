@@ -21,25 +21,32 @@ final class ReportDefinitionRepository
         $columns=array_values(array_filter(array_unique(array_map('strval',(array)($input['columns']??[])))));
         $filters=(array)($input['filters']??[]);
         $record=['id'=>'rpt_'.bin2hex(random_bytes(6)),'event_id'=>$eventId,'name'=>$name,'dataset'=>$dataset,'columns'=>$columns,'filters'=>$filters,'created_at'=>date(DATE_ATOM)];
-        $rows=$this->all();array_unshift($rows,$record);$this->store->write('reports/definitions.json',$rows);return $record;
+        return $this->store->transaction('reports/definitions.json',static function(array $rows) use ($record): array {
+            array_unshift($rows,$record);return ['data'=>$rows,'result'=>$record];
+        },[]);
     }
 
     public function update(string $id,array $input): ?array
     {
-        $rows=$this->all();$updated=null;
-        foreach($rows as &$row){
-            if(($row['id']??'')!==$id)continue;
-            if(isset($input['name']))$row['name']=trim((string)$input['name']);
-            if(isset($input['columns']))$row['columns']=array_values(array_filter(array_unique(array_map('strval',(array)$input['columns']))));
-            if(isset($input['filters']))$row['filters']=(array)$input['filters'];
-            $row['updated_at']=date(DATE_ATOM);$updated=$row;break;
-        }
-        unset($row);if($updated)$this->store->write('reports/definitions.json',$rows);return $updated;
+        return $this->store->transaction('reports/definitions.json',static function(array $rows) use ($id,$input): array {
+            $updated=null;
+            foreach($rows as &$row){
+                if(($row['id']??'')!==$id)continue;
+                if(isset($input['name']))$row['name']=trim((string)$input['name']);
+                if(isset($input['columns']))$row['columns']=array_values(array_filter(array_unique(array_map('strval',(array)$input['columns']))));
+                if(isset($input['filters']))$row['filters']=(array)$input['filters'];
+                if(trim((string)($row['name']??''))==='') throw new \InvalidArgumentException('Report name is required.');
+                $row['updated_at']=date(DATE_ATOM);$updated=$row;break;
+            }
+            unset($row);return ['data'=>$rows,'result'=>$updated];
+        },[]);
     }
 
     public function delete(string $id): bool
     {
-        $rows=$this->all();$next=array_values(array_filter($rows,fn($x)=>($x['id']??'')!==$id));
-        if(count($rows)===count($next))return false;$this->store->write('reports/definitions.json',$next);return true;
+        return $this->store->transaction('reports/definitions.json',static function(array $rows) use ($id): array {
+            $next=array_values(array_filter($rows,static fn(array $x): bool => ($x['id']??'')!==$id));
+            return ['data'=>$next,'result'=>count($rows)!==count($next)];
+        },[]);
     }
 }
