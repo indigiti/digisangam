@@ -5,7 +5,7 @@ const auth=useAuthStore()
 const initials=computed(()=>String(auth.user?.name||'DS').split(/\s+/).slice(0,2).map(x=>x[0]).join('').toUpperCase())
 const groups=[
   {label:'Core',items:[['/','Dashboard','⌂'],['/events','Events','◇'],['/registrations','Registrations','▣'],['/tickets','Tickets','▤'],['/attendees','Attendees','♙']]},
-  {label:'Operations',items:[['/communication','Communication','✉'],['/automation','Automation','⌁'],['/badges','Badges','▦'],['/agenda','Agenda','◷'],['/exhibitors','Exhibitors','▥'],['/venue','Venue','⌖'],['/onground','OnGround','◎'],['/accreditation','Accreditation','◉']]},
+  {label:'Operations',items:[['/communication','Communication','✉'],['/automation','Automation','⌁'],['/badges','Badges','▦'],['/agenda','Agenda','◷'],['/exhibitors','Exhibitors','▥'],['/venue','Venue','⌖'],['/onground','OnGround','◎'],['/entry-monitor','Entry Monitor','↔'],['/accreditation','Accreditation','◉']]},
   {label:'Business',items:[['/commerce','Commerce','¤'],['/analytics','Analytics','⌁'],['/reports','Reports','▥'],['/intelligence','Intelligence','✦'],['/event-builder','AI Builder','✣'],['/developer','Developers','⌘'],['/settings','Settings','⚙']]},
 ]
 </script>
