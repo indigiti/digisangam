@@ -4,6 +4,7 @@ use DigiSangam\Attendees\AttendeeRepository;
 use DigiSangam\Badges\BadgeTemplateRepository;
 use DigiSangam\Badges\PrintJobRepository;
 use DigiSangam\Core\Storage\JsonFileStore;
+use DigiSangam\Credentials\CredentialService;
 use DigiSangam\Operations\WorkerHeartbeatRepository;
 use DigiSangam\Printing\BadgePrintWorker;
 use DigiSangam\Printing\CupsPrintProvider;
@@ -17,7 +18,22 @@ $provider=match($providerName){
     'cups'=>new CupsPrintProvider((string)getenv('PRINTER_QUEUE')),
     default=>new LogPrintProvider(),
 };
-$result=(new BadgePrintWorker(new PrintJobRepository($store),new AttendeeRepository($store),new BadgeTemplateRepository($store),$provider))->run((int)($argv[1]??20));
+$credentialSecret=trim((string)getenv('DIGISANGAM_CREDENTIAL_SECRET'));
+if($credentialSecret===''){
+    $record=$store->read('secrets/credential.json',[]);
+    $credentialSecret=(string)($record['secret']??'');
+    if($credentialSecret===''){
+        $credentialSecret=bin2hex(random_bytes(32));
+        $store->write('secrets/credential.json',['secret'=>$credentialSecret,'created_at'=>date(DATE_ATOM)]);
+    }
+}
+$result=(new BadgePrintWorker(
+    new PrintJobRepository($store),
+    new AttendeeRepository($store),
+    new BadgeTemplateRepository($store),
+    $provider,
+    new CredentialService($credentialSecret),
+))->run((int)($argv[1]??20));
 (new WorkerHeartbeatRepository($store))->beat('badge-print',$result,300);
 fwrite(STDOUT,json_encode($result,JSON_PRETTY_PRINT|JSON_UNESCAPED_SLASHES).PHP_EOL);
 exit($result['failed']>0?2:0);
