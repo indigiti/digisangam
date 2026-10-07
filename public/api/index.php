@@ -258,6 +258,17 @@ try {
             JsonResponse::send(['error'=>'Event platform setup is not complete.'],503);
         }
 
+        if ($method === 'GET' && preg_match('#^/public/invitations/([a-f0-9]{32,})$#',$path,$m)) {
+            $invite=(new InvitationRepository($store))->findByToken($m[1]);
+            if(!$invite || in_array(($invite['status']??'pending'),['revoked','accepted'],true)) JsonResponse::send(['error'=>'Invitation not found or no longer valid.'],404);
+            JsonResponse::send([
+                'event_id'=>$invite['event_id'],
+                'email'=>$invite['email'],
+                'category'=>$invite['category'],
+                'status'=>$invite['status'],
+            ]);
+        }
+
         if ($method === 'GET' && $path === '/public/events') {
             JsonResponse::send((new PublicDiscoveryService(new EventRepository($store),new TicketRepository($store)))->browse());
         }
@@ -764,6 +775,14 @@ try {
         $invite=$invitations->create($input);
         $journal->append('invitation.created',['invitation_id'=>$invite['id']]);
         JsonResponse::send($invite,201);
+    }
+
+    if ($method === 'POST' && preg_match('#^/invitations/([^/]+)/revoke$#',$path,$m)) {
+        $auth->requirePermission('registration.manage');
+        $invite=$invitations->revoke($m[1]);
+        if(!$invite) JsonResponse::send(['error'=>'Invitation not found.'],404);
+        $journal->append('invitation.revoked',['invitation_id'=>$invite['id'],'event_id'=>$invite['event_id']]);
+        JsonResponse::send($invite);
     }
 
     $attendees = new AttendeeRepository($store);
