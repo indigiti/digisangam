@@ -364,6 +364,7 @@ try{
         'error'=>UPLOAD_ERR_OK,'size'=>filesize($tmpMedia),'tmp_name'=>$tmpMedia,'name'=>'fixture.txt',
     ],$eventId,'accreditation_document',false);
     expect(($media['event_id']??'')===$eventId && ($media['mime']??'')==='text/plain','Media upload persistence failed.');
+    expect(str_starts_with((string)($media['url']??''),'/digisangam/api/v1/public/media/'),'Media URL must remain valid under the DigiOps /digisangam subpath when APP_URL is not exported.');
 
     // Wallet issuance lifecycle is available even before provider credentials are configured.
     $wallet=(new WalletPassService(new WalletPassRepository($store),'wallet-secret'))->issue($event,$vip,$issued['payload'],'google');
