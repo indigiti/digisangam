@@ -1,10 +1,12 @@
 # DigiSangam Integration Runtime
 
+DigiSangam 3.1.0 keeps providers behind adapters. Core workflows remain testable with log/simulated providers; production delivery activates when the corresponding provider credentials or hardware are configured.
+
 ## Environment
 
-Copy `.env.example` values into the server environment. The application does not read secrets from Git.
+Copy the values from `.env.example` into the server environment. Do not commit production secrets.
 
-### Razorpay
+## Payments — Razorpay
 
 Set:
 
@@ -13,58 +15,152 @@ Set:
 - `RAZORPAY_KEY_SECRET`
 - `RAZORPAY_WEBHOOK_SECRET`
 
-Configure the Razorpay webhook URL as:
+Webhook route:
 
-`https://YOUR-DOMAIN/api/v1/webhooks/payments/razorpay`
+`/digisangam/api/v1/webhooks/payments/razorpay`
 
-Recommended events:
+Checkout signatures are verified server-side; signed webhooks are the asynchronous recovery/source-of-truth path.
 
-- `payment.captured`
-- `payment.failed`
-- `order.paid`
+## Email
 
-Checkout return signatures are verified server-side; the webhook is the recovery/source-of-truth path.
+`DIGISANGAM_EMAIL_PROVIDER` supports:
 
-### Email
-
-Set `DIGISANGAM_EMAIL_PROVIDER` to one of:
-
-- `log` — safe development mode
+- `log` — simulated development delivery
 - `mail` — PHP mail()
-- `smtp` — native SMTP client
+- `smtp` — native SMTP adapter
 
-For SMTP configure host, port, encryption, username, password and sender values from `.env.example`.
+Configure the sender and SMTP settings from `.env.example`.
 
-### WhatsApp Cloud API
+## WhatsApp
 
-Set `DIGISANGAM_WHATSAPP_PROVIDER=meta` and configure:
+Set `DIGISANGAM_WHATSAPP_PROVIDER=meta` and configure the Meta Cloud API phone-number ID, access token, language and optional Graph version.
 
-- `WHATSAPP_PHONE_NUMBER_ID`
-- `WHATSAPP_ACCESS_TOKEN`
-- `WHATSAPP_TEMPLATE_LANGUAGE`
+The log adapter remains available for safe local verification.
 
-Approved Meta templates expected by the worker:
+## SMS
 
-- `registration_confirmation`
-- `payment_confirmed`
+`DIGISANGAM_SMS_PROVIDER` supports:
+
+- `log`
+- `http`
+
+The generic HTTP adapter posts:
+
+```json
+{"to":"9198...","message":"...","sender":"..."}
+```
+
+Configure:
+
+- `SMS_HTTP_ENDPOINT`
+- `SMS_HTTP_TOKEN`
+- `SMS_SENDER`
+
+This keeps DigiSangam independent of a single SMS vendor.
 
 ## Notification worker
 
-Run periodically with cron/systemd:
+Run periodically:
 
 `php scripts/notifications.php 50`
 
-For example, once per minute:
+It processes email, WhatsApp and SMS messages, applies retries and records simulated/sent/failed delivery state truthfully.
 
-`* * * * * cd /path/to/digisangam && /usr/bin/php scripts/notifications.php 50 >> storage/notifications-worker.log 2>&1`
+## Developer webhooks
 
-Messages retry with capped exponential delay metadata and move to `failed` after five processing attempts.
+Admin users can create event-scoped webhook endpoints from **Developers**.
 
-## QR scanner
+DigiSangam signs each JSON delivery with:
 
-Admin/API routes:
+`X-DigiSangam-Signature: sha256=<hmac>`
+
+Run the retryable webhook worker:
+
+`php scripts/webhooks.php 50`
+
+Webhook signing secrets are returned on creation and kept out of subsequent list responses.
+
+## Developer API
+
+Create a scoped API key from **Developers**. External requests send:
+
+`X-DigiSangam-Key: dsk_...`
+
+Available read surfaces:
+
+- `GET /digisangam/api/v1/developer/v1/events/{event_id}`
+- `GET /digisangam/api/v1/developer/v1/events/{event_id}/attendees`
+- `GET /digisangam/api/v1/developer/v1/events/{event_id}/sessions`
+- `GET /digisangam/api/v1/developer/v1/events/{event_id}/analytics`
+
+Keys are stored as hashes and can be scoped/revoked.
+
+## Wallet passes
+
+The attendee confirmation page can issue Apple or Google wallet records.
+
+Configure provider/issuer handoff bases:
+
+- `APPLE_WALLET_PASS_BASE_URL`
+- `GOOGLE_WALLET_SAVE_BASE_URL`
+
+Without issuer credentials, DigiSangam returns `provider_configuration_required` rather than falsely claiming that a wallet pass is live.
+
+## Badge printing
+
+`DIGISANGAM_PRINT_PROVIDER` supports:
+
+- `log` — simulated print delivery
+- `raw_tcp` — direct network printer, normally port 9100
+- `cups` — native server CUPS queue
+
+Configure:
+
+- `PRINTER_HOST`
+- `PRINTER_PORT`
+- `PRINTER_QUEUE`
+
+Run:
+
+`php scripts/badge-print.php 20`
+
+The worker resolves the attendee/template, renders printer payload and persists printed/simulated/failed state.
+
+## QR, NFC and RFID access
+
+QR routes:
 
 - `POST /api/v1/scanner/verify`
 - `POST /api/v1/scanner/checkin`
 
-Both require an authenticated role with `attendees.checkin` permission. Signed QR verification checks credential signature, attendee approval, event binding and paid-order state before allowing entry.
+NFC/RFID UIDs are first bound to an attendee from **OnGround**. Reader input can then be passed as:
+
+- `nfc:UID`
+- `rfid:UID`
+
+The resolved identity uses the same attendee, payment, event and zone policy engine as QR credentials.
+
+## Media uploads
+
+DigiSangam stores branding assets, registration uploads and accreditation documents in private runtime storage with metadata in the JSON repository layer.
+
+Public branding assets are exposed through controlled media URLs; private uploads are not public by default.
+
+## Intelligence service
+
+Configure:
+
+- `DIGISANGAM_INTELLIGENCE_URL`
+- `DIGISANGAM_INTELLIGENCE_TOKEN`
+
+The Python/FastAPI service supports the Event Graph intelligence workflows and AI Event Builder. Supported PHP fallbacks remain available if the Python service is unavailable.
+
+## DigiOps workers
+
+A production deployment should schedule:
+
+- `scripts/notifications.php`
+- `scripts/webhooks.php`
+- `scripts/badge-print.php`
+
+The DigiOps release verifier checks that all three workers are present in the private release payload.
