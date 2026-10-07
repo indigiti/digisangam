@@ -106,12 +106,17 @@ final class RegistrationCheckoutService
                 'confirmation_token'=>$confirmationToken,
             ]);
 
+            $reservationTtl=max(5,min(120,(int)(getenv('DIGISANGAM_RESERVATION_TTL_MINUTES')?:15)));
             $order = $this->orders->create([
                 'event_id'=>$eventId,'attendee_id'=>$attendee['id'],'ticket_id'=>$ticketId,
                 'amount'=>(int)($reserved['price'] ?? 0),'currency'=>strtoupper((string)($public['event']['currency']??'INR')),'status'=>$requiresPayment?'pending':'paid',
+                'reservation_expires_at'=>$requiresPayment?date(DATE_ATOM,time()+($reservationTtl*60)):'',
             ]);
             $payment = $this->payments->create($order, ['attendee'=>$attendee,'event'=>$public['event'],'ticket'=>$reserved]);
             $order = $this->orders->updatePayment((string)$order['id'],$payment) ?? $order;
+            if (($payment['status'] ?? '') === 'paid') {
+                $reserved=$this->tickets->commitReservation($ticketId,$eventId);
+            }
 
             if (($payment['status'] ?? '') === 'paid' && $approvalMode !== 'manual') {
                 $attendee = $this->attendees->update((string)$attendee['id'],['status'=>'Confirmed']) ?? $attendee;
@@ -121,7 +126,7 @@ final class RegistrationCheckoutService
             }
         } catch (\Throwable $e) {
             if ($attendee !== null) $this->attendees->delete((string)$attendee['id']);
-            $this->tickets->releaseOne($ticketId,$eventId);
+            $this->tickets->releaseReservation($ticketId,$eventId);
             throw $e;
         }
 
