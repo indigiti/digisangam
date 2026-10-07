@@ -6,7 +6,7 @@ import {useEventStore} from '../stores/event'
 const events=useEventStore()
 const palette=[
   ['Text Field','text'],['Email','email'],['Phone','phone'],['Dropdown','select'],
-  ['Multi Select','multiselect'],['Radio Button','radio'],['Date Picker','date'],['Paragraph','paragraph']
+  ['Multi Select','multiselect'],['Radio Button','radio'],['Date Picker','date'],['File Upload','file'],['Paragraph','paragraph']
 ]
 const schema=reactive({title:'Event Registration',approval_mode:'auto',categories:[],fields:[]})
 const selected=ref(0),saving=ref(false),saved=ref(false),error=ref(''),inviteEmail=ref(''),inviteCategory=ref('General'),invites=ref([])
@@ -66,6 +66,16 @@ async function save(){
   }catch(e){error.value=e.message}
   finally{saving.value=false}
 }
+function invitationLink(invite){
+  const base=(import.meta.env.BASE_URL||'/').replace(/\/$/,'')
+  return window.location.origin+base+'/e/'+eventId.value+'?invite='+encodeURIComponent(invite.token)
+}
+async function copyInvitation(invite){
+  await navigator.clipboard.writeText(invitationLink(invite))
+}
+async function revokeInvitation(invite){
+  try{Object.assign(invite,await api.revokeInvitation(invite.id))}catch(e){error.value=e.message}
+}
 async function invite(){
   if(!eventId.value||!inviteEmail.value)return
   error.value=''
@@ -89,12 +99,18 @@ async function invite(){
   <div class="panel p-4">
     <p class="panel-kicker">Add field</p>
     <div class="mt-3 space-y-2"><button v-for="[label,type] in palette" :key="type" @click="add(label,type)" class="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-left text-xs font-semibold hover:border-indigo-300 hover:bg-indigo-50">{{label}}</button></div>
-    <p class="mt-3 text-[11px] leading-5 text-slate-400">File upload is intentionally hidden until binary storage/download is implemented; no filename-only fake upload is exposed.</p>
+    <p class="mt-3 text-[11px] leading-5 text-slate-400">File uploads are stored privately and can be reviewed from the attendee record.</p>
   </div>
   <div class="panel p-4">
     <p class="panel-kicker">Invitations</p>
     <p class="mt-2 text-xs text-slate-500">{{invites.length}} invitations for this event.</p>
     <div class="mt-3 space-y-2"><input v-model="inviteEmail" class="control" type="email" placeholder="email@example.com"/><select v-model="inviteCategory" class="control"><option v-for="c in schema.categories" :key="c">{{c}}</option></select><button class="btn-primary w-full" @click="invite">Create invitation</button></div>
+    <div v-if="invites.length" class="mt-4 space-y-2 border-t border-slate-100 pt-4">
+      <div v-for="row in invites.slice(0,8)" :key="row.id" class="rounded-xl bg-slate-50 p-3">
+        <div class="flex items-start justify-between gap-2"><div class="min-w-0"><p class="truncate text-xs font-bold">{{row.email}}</p><p class="mt-1 text-[10px] text-slate-400">{{row.category}} · {{row.status}}</p></div><span class="status-badge" :class="row.status==='pending'?'badge-draft':row.status==='accepted'?'badge-published':'bg-rose-100 text-rose-700'">{{row.status}}</span></div>
+        <div v-if="row.status==='pending'" class="mt-2 flex gap-2"><button class="btn-secondary py-1 text-[10px]" @click="copyInvitation(row)">Copy link</button><button class="btn-secondary py-1 text-[10px] text-rose-600" @click="revokeInvitation(row)">Revoke</button></div>
+      </div>
+    </div>
   </div>
 </aside>
 
