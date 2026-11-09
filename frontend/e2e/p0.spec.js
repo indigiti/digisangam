@@ -127,3 +127,58 @@ test('P0 prepared device survives offline reload, verifies credentials, and reco
   await page.getByRole('button',{name:/Sync \d+ check-ins/}).click().catch(() => {})
   await expect(page.getByText('Pending sync')).toBeVisible()
 })
+
+
+test('P0 legacy queued check-ins survive encryption migration, passphrase renewal and reload', async ({page}) => {
+  await mockApi(page,{snapshot:await signedSnapshot()})
+  await page.goto(BASE+'onground')
+  await expect(page.getByText('Secure offline access')).toBeVisible()
+  await page.evaluate(async value => {
+    await new Promise((resolve,reject) => {
+      const request=indexedDB.open('digisangam-onground',2)
+      request.onsuccess=()=>{
+        const db=request.result
+        const tx=db.transaction('checkin_queue','readwrite')
+        tx.objectStore('checkin_queue').put({
+          local_id:'off_legacy_a',event_id:'evt_a',attendee_id:'att_a',
+          payload:value,scanned_at:new Date().toISOString(),zone_id:'',
+        })
+        tx.oncomplete=()=>{db.close();resolve()}
+        tx.onerror=()=>{db.close();reject(tx.error)}
+      }
+      request.onerror=()=>reject(request.error)
+    })
+  },attendeeCredential)
+  const oldPass='First-OffLine-Passphrase'
+  const newPass='Renewed-OffLine-Passphrase'
+  await page.getByPlaceholder('Set offline passphrase (10+ characters)').fill(oldPass)
+  await page.getByRole('button',{name:'Prepare / Re-sync'}).click()
+  await expect(page.getByText('Offline snapshot unlocked')).toBeVisible()
+  const storage=async()=>page.evaluate(async()=>{
+    return new Promise((resolve,reject)=>{
+      const request=indexedDB.open('digisangam-onground',2)
+      request.onsuccess=()=>{
+        const db=request.result
+        const tx=db.transaction('checkin_queue','readonly')
+        const record=tx.objectStore('checkin_queue').get('off_legacy_a')
+        record.onsuccess=()=>{db.close();resolve(record.result)}
+        record.onerror=()=>{db.close();reject(record.error)}
+      }
+      request.onerror=()=>reject(request.error)
+    })
+  })
+  const encrypted=await storage()
+  expect(encrypted.format).toBe(3)
+  expect(encrypted.payload).toBeUndefined()
+  expect(encrypted.ciphertext).toBeTruthy()
+  // New passphrase must rewrap pending check-ins without clearing the queue.
+  await page.getByPlaceholder('Set offline passphrase (10+ characters)').fill(newPass)
+  await page.getByRole('button',{name:'Prepare / Re-sync'}).click()
+  expect((await storage()).ciphertext).not.toEqual(encrypted.ciphertext)
+  await page.reload()
+  await expect(page.getByPlaceholder('Offline passphrase',{exact:true})).toBeVisible()
+  await page.getByPlaceholder('Offline passphrase',{exact:true}).fill(newPass)
+  await page.getByRole('button',{name:'Unlock offline data'}).click()
+  await expect(page.getByText('Offline snapshot unlocked')).toBeVisible()
+  expect((await storage()).format).toBe(3)
+})
