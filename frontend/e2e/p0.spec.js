@@ -30,7 +30,7 @@ async function signedSnapshot() {
   return { ...payload,signature_algorithm:'Ed25519',signed_payload:Buffer.from(encoded).toString('base64'),signature:Buffer.from(signature).toString('base64') }
 }
 
-async function mockApi(page, { snapshot = null, offlineState = { offline:false } } = {}) {
+async function mockApi(page, { snapshot = null, offlineState = { offline:false }, onSync = () => {} } = {}) {
   await page.route('**/api/v1/**', async route => {
     if (offlineState.offline) return route.abort('internetdisconnected')
     const url = new URL(route.request().url())
@@ -52,6 +52,7 @@ async function mockApi(page, { snapshot = null, offlineState = { offline:false }
     if(path.startsWith('onground/snapshot/')) return respond(route,snapshot)
     if(path==='onground/sync') {
       const body = route.request().postDataJSON()
+      onSync(body.items || [])
       return respond(route,{results:(body.items||[]).map(item => ({local_id:item.local_id,result:{allowed:true,reason:'VALID'}}))})
     }
     if(path.startsWith('attendees') || path.startsWith('tickets') || path.startsWith('credentials/bindings')) return respond(route,[])
@@ -97,7 +98,8 @@ test('P0 public discovery search uses real filtered event records', async ({page
 
 test('P0 prepared device survives offline reload, verifies credentials, and reconciles queued entry', async ({page,context}) => {
   const offlineState={offline:false}
-  await mockApi(page,{snapshot:await signedSnapshot(),offlineState})
+  let syncedItems=0
+  await mockApi(page,{snapshot:await signedSnapshot(),offlineState,onSync:items=>{syncedItems+=items.length}})
   await page.goto(BASE+'onground')
   await expect(page.getByText('Secure offline access')).toBeVisible()
   await page.evaluate(async () => { await navigator.serviceWorker.ready })
