@@ -49,7 +49,7 @@ final class OfflineSnapshotService
         // Derive a separate Ed25519 signing key from the stable credential secret.
         // The browser verifies the exact signed bytes (signed_payload) before use.
         if(!function_exists('sodium_crypto_sign_seed_keypair')){
-            throw new \\RuntimeException('Sodium is required for verifiable offline snapshots.');
+            throw new \RuntimeException('Sodium is required for verifiable offline snapshots.');
         }
         $seed=hash('sha256','digisangam/offline-v3|'.$this->secret,true);
         $pair=sodium_crypto_sign_seed_keypair($seed);
