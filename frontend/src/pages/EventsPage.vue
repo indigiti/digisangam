@@ -2,12 +2,14 @@
 import { computed, onMounted, ref, watch } from 'vue'
 import { api } from '../services/api'
 import { useEventStore } from '../stores/event'
+import DsButton from '../components/ui/DsButton.vue'
+import DsStatusBadge from '../components/ui/DsStatusBadge.vue'
+import DsEmptyState from '../components/ui/DsEmptyState.vue'
 
 const eventStore=useEventStore()
 const rows=ref([]),active=ref('All'),search=ref(''),order=ref('upcoming'),limit=ref(24),error=ref(''),loading=ref(true)
 const tabs=['All','Draft','Published','Live','Completed','Archived']
 const countFor=status=>status==='All'?rows.value.length:rows.value.filter(row=>row.status===status).length
-const statusClass=status=>({Live:'badge-live',Published:'badge-published',Draft:'badge-draft',Completed:'bg-slate-100 text-slate-700',Archived:'bg-slate-100 text-slate-500'}[status]||'badge-draft')
 const filtered=computed(()=>{
   const needle=search.value.trim().toLowerCase()
   const list=rows.value.filter(row=>{
@@ -40,7 +42,7 @@ onMounted(async()=>{
         <h1 class="page-title">Every event. One workspace.</h1>
         <p class="page-subtitle">Create, manage and monitor your real events across every stage.</p>
       </div>
-      <RouterLink to="/events/create" class="btn-primary">＋ Create event</RouterLink>
+      <DsButton to="/events/create">＋ Create event</DsButton>
     </section>
 
     <div v-if="error" role="alert" class="rounded-xl border border-rose-200 bg-rose-50 p-4 text-sm font-semibold text-rose-700">{{error}}</div>
@@ -93,15 +95,12 @@ onMounted(async()=>{
       <div v-if="loading" class="grid gap-4 p-5 md:grid-cols-2">
         <div v-for="item in 4" :key="item" class="h-64 animate-pulse rounded-2xl bg-slate-100"></div>
       </div>
-      <div v-else-if="!filtered.length" class="premium-empty">
-        <div>
-          <div class="mx-auto grid h-14 w-14 place-items-center rounded-2xl bg-indigo-50 text-xl text-indigo-500">◇</div>
-          <h3 class="mt-5 text-lg font-extrabold">{{rows.length?'No matching events':'Your event portfolio is empty'}}</h3>
-          <p class="mx-auto mt-2 max-w-md text-sm leading-6 text-slate-500">{{rows.length?'Try changing the search or status filter.':'Create your first event to configure registration, tickets and on-ground operations.'}}</p>
-          <button v-if="rows.length" class="btn-secondary mt-5" type="button" @click="search='';active='All'">Clear filters</button>
-          <RouterLink v-else to="/events/create" class="btn-primary mt-5">Create event</RouterLink>
-        </div>
-      </div>
+      <DsEmptyState v-else-if="!filtered.length" :title="rows.length?'No matching events':'Your event portfolio is empty'" :description="rows.length?'Try changing the search or status filter.':'Create your first event to configure registrations, tickets and on-ground operations.'">
+        <template #actions>
+          <DsButton v-if="rows.length" variant="secondary" @click="search='';active='All'">Clear filters</DsButton>
+          <DsButton v-else to="/events/create">Create event</DsButton>
+        </template>
+      </DsEmptyState>
       <div v-else class="grid gap-4 p-4 md:grid-cols-2 lg:p-5">
         <article v-for="event in visible" :key="event.id" class="group overflow-hidden rounded-[18px] border border-slate-200/80 bg-white transition hover:border-indigo-200 hover:shadow-lg hover:shadow-indigo-900/5">
           <div class="flex gap-4 p-4 sm:p-5">
@@ -110,7 +109,7 @@ onMounted(async()=>{
               <div v-else class="flex h-full w-full items-end p-3 text-xs font-extrabold text-white" :style="{background:'linear-gradient(140deg,'+(event.branding?.primary_color||'#5c53d8')+','+(event.branding?.secondary_color||'#34415c')+')'}">{{event.category||'Event'}}</div>
             </RouterLink>
             <div class="min-w-0 flex-1">
-              <div class="flex items-center justify-between gap-2"><span class="status-badge" :class="statusClass(event.status)">{{event.status}}</span><span class="text-[10px] font-bold text-slate-400">{{event.category||event.type||'Event'}}</span></div>
+              <div class="flex items-center justify-between gap-2"><DsStatusBadge :status="event.status"/><span class="text-[10px] font-bold text-slate-400">{{event.category||event.type||'Event'}}</span></div>
               <RouterLink :to="'/events/'+event.id" class="mt-3 block line-clamp-2 text-[16px] font-extrabold leading-5 tracking-tight text-slate-900 group-hover:text-indigo-600">{{event.name}}</RouterLink>
               <p class="mt-2 line-clamp-2 text-xs leading-5 text-slate-500">{{event.start_date||'Date to be confirmed'}} · {{event.location||'Venue not set'}}</p>
             </div>
