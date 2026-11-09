@@ -51,7 +51,7 @@ $title=(string)($event['public_page']['headline']??'');
 if($title==='')$title=(string)($event['name']??'Event');
 $description=(string)($event['description']??'');
 if($description==='')$description='Discover and register for events with DigiSangam.';
-$description=mb_substr($description,0,200,'UTF-8');
+$description=function_exists('mb_substr')?mb_substr($description,0,200,'UTF-8'):substr($description,0,200);
 $image=(string)($event['branding']['cover_url']??$event['branding']['poster_url']??'');
 if($image!==''&&!filter_var($image,FILTER_VALIDATE_URL))$image='';
 $schema=null;
@@ -69,7 +69,7 @@ if($event && $canonical!==''){
     if(!empty($event['start_date']))$schema['startDate']=$event['start_date'];
     if(!empty($event['end_date']))$schema['endDate']=$event['end_date'];
     if(!empty($event['location'])||!empty($event['venue_name'])){
-        $schema['location']=['@type'=>'Place','name'=>(string)($event['venue_name']?:$event['location']),'address'=>(string)($event['location']??'')];
+        $schema['location']=['@type'=>'Place','name'=>(string)($event['venue_name']??$event['location']),'address'=>(string)($event['location']??'')];
     }
     if($image!=='')$schema['image']=$image;
     if(!empty($event['organizer']['name']))$schema['organizer']=['@type'=>'Organization','name'=>(string)$event['organizer']['name']];
