@@ -120,8 +120,9 @@ test('P0 prepared device survives offline reload, verifies credentials, and reco
   await page.locator('textarea[placeholder^="digisangam://"]').fill(attendeeCredential)
   await page.getByRole('button',{name:'Verify & Enter'}).click()
   await expect(page.getByText('QUEUED_OFFLINE')).toBeVisible()
-  await context.setOffline(false)
+  // Restore API mock before Chromium emits the 'online' event to avoid a race.
   offlineState.offline=false
+  await context.setOffline(false)
   await expect(page.getByText('Online',{exact:true})).toBeVisible()
   await page.getByRole('button',{name:/Sync \d+ check-ins/}).click().catch(() => {})
   await expect(page.getByText('Pending sync')).toBeVisible()
