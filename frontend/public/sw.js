@@ -1,6 +1,6 @@
 /* Offline shell is explicitly limited to the OnGround experience.
    Never cache authenticated API, registration or checkout responses. */
-const CACHE = 'digisangam-offline-v4'
+const CACHE = 'digisangam-offline-v5'
 const scopePath = new URL(self.registration.scope).pathname.replace(/\/$/, '')
 const appPath = path => scopePath + (path.startsWith('/') ? path : '/' + path)
 const OFFLINE_ROUTES = [appPath('/onground')]
@@ -9,8 +9,22 @@ const isShell = path => OFFLINE_ROUTES.includes(path) || path === appPath('/') |
 const cacheable = response => response.ok && response.type === 'basic' && !response.headers.has('Set-Cookie')
 
 self.addEventListener('install', event => {
-  event.waitUntil(caches.open(CACHE).then(cache => cache.addAll([appPath('/onground'), appPath('/manifest.webmanifest')])).catch(() => {}))
-  self.skipWaiting()
+  event.waitUntil((async () => {
+    const response = await fetch(appPath('/offline-precache.json'), { cache: 'no-store' })
+    if (!response.ok) throw new Error('OnGround precache manifest is not available.')
+    const manifest = await response.json()
+    if (manifest.version !== 1 || !Array.isArray(manifest.assets) || manifest.assets.length === 0) {
+      throw new Error('OnGround precache manifest is invalid.')
+    }
+    const paths = [appPath('/onground'), appPath('/manifest.webmanifest'), appPath('/offline-precache.json')]
+    for (const asset of manifest.assets) {
+      if (!/^\\/assets\\/[A-Za-z0-9_./-]+$/.test(asset)) throw new Error('Invalid offline asset path.')
+      paths.push(appPath(asset))
+    }
+    const cache = await caches.open(CACHE)
+    await cache.addAll([...new Set(paths)])
+    self.skipWaiting()
+  })())
 })
 self.addEventListener('activate', event => {
   event.waitUntil(caches.keys().then(keys => Promise.all(keys.filter(k => k.startsWith('digisangam-') && k !== CACHE).map(k => caches.delete(k)))))
