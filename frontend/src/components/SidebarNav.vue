@@ -1,9 +1,11 @@
 <script setup>
-import { computed, ref, watch } from 'vue'
+import { computed, ref, watch, nextTick, onMounted, onBeforeUnmount } from 'vue'
 import { useRoute } from 'vue-router'
 import { useAuthStore } from '../stores/auth'
 
-defineProps({ open: { type: Boolean, default: false } })
+const props = defineProps({ open: { type: Boolean, default: false } })
+const drawer = ref(null)
+const isWide = ref(false)
 const emit = defineEmits(['close'])
 const auth = useAuthStore()
 const route = useRoute()
@@ -61,11 +63,53 @@ const paths = {
   settings: 'M12 15.5a3.5 3.5 0 1 0 0-7a3.5 3.5 0 0 0 0 7 M12 2v2 M12 20v2 M4 12H2 M22 12h-2 M5 5l2 2 M19 19l-2-2 M19 5l-2 2 M5 19l2-2',
 }
 watch(() => route.fullPath, () => emit('close'))
+watch(() => props.open, async isOpen => {
+  if (typeof document === 'undefined') return
+  document.body.classList.toggle('nav-drawer-open', isOpen && !isWide.value)
+  if (isOpen) {
+    await nextTick()
+    drawer.value?.querySelector('[aria-label="Close navigation"]')?.focus()
+  }
+})
+function handleResize() {
+  isWide.value = window.matchMedia('(min-width: 1024px)').matches
+  document.body.classList.toggle('nav-drawer-open', props.open && !isWide.value)
+}
+function handleGlobalKey(event) {
+  if (event.key === 'Escape' && props.open) emit('close')
+  if (event.key !== '/' || !(props.open || isWide.value)) return
+  const tag = event.target?.tagName?.toLowerCase()
+  if (['input','textarea','select'].includes(tag) || event.ctrlKey || event.metaKey || event.altKey) return
+  event.preventDefault()
+  drawer.value?.querySelector('[aria-label="Filter navigation"]')?.focus()
+}
+function trapFocus(event) {
+  if (!props.open || isWide.value || event.key !== 'Tab') return
+  const focusable = [...(drawer.value?.querySelectorAll('a[href],button:not([disabled]),input:not([disabled])') || [])]
+  if (!focusable.length) return
+  const first = focusable[0], last = focusable[focusable.length - 1]
+  if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last.focus() }
+  else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus() }
+}
+onMounted(() => {
+  handleResize()
+  window.addEventListener('resize', handleResize)
+  window.addEventListener('keydown', handleGlobalKey)
+})
+onBeforeUnmount(() => {
+  document.body.classList.remove('nav-drawer-open')
+  window.removeEventListener('resize', handleResize)
+  window.removeEventListener('keydown', handleGlobalKey)
+})
 </script>
 
 <template>
   <div v-if="open" class="fixed inset-0 z-40 bg-[#060b19]/65 backdrop-blur-[2px] lg:hidden" @click="emit('close')" aria-hidden="true"></div>
   <aside
+    ref="drawer"
+    :inert="!open && !isWide"
+    :aria-hidden="!open && !isWide"
+    @keydown="trapFocus"
     id="app-navigation"
     class="app-sidebar fixed inset-y-0 left-0 z-50 flex w-64 -translate-x-full flex-col text-white transition-transform duration-200 ease-out lg:translate-x-0"
     :class="{ 'translate-x-0': open }"
