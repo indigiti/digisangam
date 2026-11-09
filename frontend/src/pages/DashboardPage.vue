@@ -4,6 +4,7 @@ import {api} from '../services/api'
 import {useAuthStore} from '../stores/auth'
 import {useEventStore} from '../stores/event'
 import StatCard from '../components/StatCard.vue'
+import DsButton from '../components/ui/DsButton.vue'
 import LineSpark from '../components/LineSpark.vue'
 
 const auth=useAuthStore(),events=useEventStore(),data=ref(null),error=ref('')
@@ -39,7 +40,7 @@ watch(()=>events.currentId,load)
       </div>
       <div class="flex flex-wrap gap-2">
         <RouterLink to="/events" class="btn-secondary">All events</RouterLink>
-        <RouterLink to="/events/create" class="btn-primary"><span aria-hidden="true">＋</span> Create event</RouterLink>
+        <DsButton to="/events/create"><span aria-hidden="true">＋</span> Create event</DsButton>
       </div>
     </section>
 
