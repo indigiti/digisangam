@@ -3,12 +3,14 @@ import { computed, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
 import { useAuthStore } from '../stores/auth'
 import { useEventStore } from '../stores/event'
+import { useThemeStore } from '../stores/theme'
 
 defineProps({ mobileNavOpen: { type: Boolean, default: false } })
 const emit = defineEmits(['toggle-menu'])
 const route = useRoute()
 const auth = useAuthStore()
 const events = useEventStore()
+const theme = useThemeStore()
 const initials = computed(() => String(auth.user?.name || 'DS').trim().split(/\s+/).slice(0, 2).map(x => x[0]).join('').toUpperCase())
 const title = computed(() => {
   const names = {
@@ -52,6 +54,10 @@ onMounted(() => { if (!events.loaded) events.load().catch(() => {}) })
       <RouterLink v-else to="/events/create" class="btn-primary text-nowrap">+ New Event</RouterLink>
     </div>
     <nav class="ml-auto flex shrink-0 items-center gap-1 sm:gap-2" aria-label="Quick actions">
+      <button type="button" class="icon-btn" :aria-label="theme.isDark?'Switch to light mode':'Switch to dark mode'" :title="theme.isDark?'Light appearance':'Dark appearance'" @click="theme.toggle()">
+        <svg v-if="theme.isDark" viewBox="0 0 24 24" class="h-[19px] w-[19px]" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2 M12 20v2 M2 12h2 M20 12h2 M4.93 4.93l1.42 1.42 M17.65 17.65l1.42 1.42 M4.93 19.07l1.42-1.42 M17.65 6.35l1.42-1.42"/></svg>
+        <svg v-else viewBox="0 0 24 24" class="h-[19px] w-[19px]" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M20.9 13.2A8.8 8.8 0 0 1 10.8 3.1 9 9 0 1 0 20.9 13.2Z"/></svg>
+      </button>
       <RouterLink to="/intelligence" class="icon-btn" aria-label="Intelligence" title="Intelligence">
         <svg viewBox="0 0 24 24" class="h-[19px] w-[19px]" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="m12 2 2.4 7.6L22 12l-7.6 2.4L12 22l-2.4-7.6L2 12l7.6-2.4z"/></svg>
       </RouterLink>
