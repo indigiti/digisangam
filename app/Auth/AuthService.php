@@ -154,7 +154,8 @@ final class AuthService
 
     public function updateUser(string $id,array $input): ?array
     {
-        $users=$this->users();$updated=null;
+        return $this->store->transaction('auth/users.json',function(array $users) use ($id,$input): array {
+            $updated=null;
         foreach($users as &$user){
             if(($user['id']??'')!==$id) continue;
             $nextRole=array_key_exists('role',$input)?trim((string)$input['role']):(string)($user['role']??'viewer');
@@ -183,8 +184,8 @@ final class AuthService
             break;
         }
         unset($user);
-        if($updated!==null) $this->store->write('auth/users.json',$users);
-        return $updated;
+            return ['data'=>$users,'result'=>$updated];
+        },[]);
     }
 
     private function users(): array
