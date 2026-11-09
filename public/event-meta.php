@@ -29,7 +29,11 @@ if(!is_file($index)){
     echo 'DigiSangam frontend unavailable';
     exit;
 }
+// Path takes precedence over query parameters: an invite or duplicated
+// ?event_id= value must never change the metadata identity of /e/{id}.
+$path=parse_url((string)($_SERVER['REQUEST_URI']??''),PHP_URL_PATH);
 $eventId=trim((string)($_GET['event_id']??''));
+if(is_string($path)&&preg_match('~/digisangam/e/([A-Za-z0-9_-]{1,100})/?$~',$path,$matches))$eventId=$matches[1];
 $event=null;
 if(preg_match('/^[A-Za-z0-9_-]{1,100}$/',$eventId)){
     $store=new JsonFileStore(DIGISANGAM_STORAGE_ROOT);
