@@ -1,32 +1,32 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import AppShell from '../layouts/AppShell.vue'
-import AccessPage from '../pages/AccessPage.vue'
-import PublicEventPage from '../pages/PublicEventPage.vue'
-import PublicDiscoveryPage from '../pages/PublicDiscoveryPage.vue'
-import PublicConfirmationPage from '../pages/PublicConfirmationPage.vue'
-import DashboardPage from '../pages/DashboardPage.vue'
-import EventsPage from '../pages/EventsPage.vue'
-import EventCreatePage from '../pages/EventCreatePage.vue'
-import EventDetailPage from '../pages/EventDetailPage.vue'
-import RegistrationBuilderPage from '../pages/RegistrationBuilderPage.vue'
-import AttendeesPage from '../pages/AttendeesPage.vue'
-import TicketsPage from '../pages/TicketsPage.vue'
-import CommercePage from '../pages/CommercePage.vue'
-import AnalyticsPage from '../pages/AnalyticsPage.vue'
-import IntelligencePage from '../pages/IntelligencePage.vue'
+const AccessPage = () => import('../pages/AccessPage.vue')
+const PublicEventPage = () => import('../pages/PublicEventPage.vue')
+const PublicDiscoveryPage = () => import('../pages/PublicDiscoveryPage.vue')
+const PublicConfirmationPage = () => import('../pages/PublicConfirmationPage.vue')
+const DashboardPage = () => import('../pages/DashboardPage.vue')
+const EventsPage = () => import('../pages/EventsPage.vue')
+const EventCreatePage = () => import('../pages/EventCreatePage.vue')
+const EventDetailPage = () => import('../pages/EventDetailPage.vue')
+const RegistrationBuilderPage = () => import('../pages/RegistrationBuilderPage.vue')
+const AttendeesPage = () => import('../pages/AttendeesPage.vue')
+const TicketsPage = () => import('../pages/TicketsPage.vue')
+const CommercePage = () => import('../pages/CommercePage.vue')
+const AnalyticsPage = () => import('../pages/AnalyticsPage.vue')
+const IntelligencePage = () => import('../pages/IntelligencePage.vue')
 import OnGroundPage from '../pages/OnGroundPage.vue'
-import EntryMonitorPage from '../pages/EntryMonitorPage.vue'
-import CommunicationPage from '../pages/CommunicationPage.vue'
-import AutomationPage from '../pages/AutomationPage.vue'
-import BadgesPage from '../pages/BadgesPage.vue'
-import AgendaPage from '../pages/AgendaPage.vue'
-import ExhibitorsPage from '../pages/ExhibitorsPage.vue'
-import VenuePage from '../pages/VenuePage.vue'
-import SettingsPage from '../pages/SettingsPage.vue'
-import DeveloperPage from '../pages/DeveloperPage.vue'
-import EventBuilderPage from '../pages/EventBuilderPage.vue'
-import ReportsPage from '../pages/ReportsPage.vue'
-import AccreditationPage from '../pages/AccreditationPage.vue'
+const EntryMonitorPage = () => import('../pages/EntryMonitorPage.vue')
+const CommunicationPage = () => import('../pages/CommunicationPage.vue')
+const AutomationPage = () => import('../pages/AutomationPage.vue')
+const BadgesPage = () => import('../pages/BadgesPage.vue')
+const AgendaPage = () => import('../pages/AgendaPage.vue')
+const ExhibitorsPage = () => import('../pages/ExhibitorsPage.vue')
+const VenuePage = () => import('../pages/VenuePage.vue')
+const SettingsPage = () => import('../pages/SettingsPage.vue')
+const DeveloperPage = () => import('../pages/DeveloperPage.vue')
+const EventBuilderPage = () => import('../pages/EventBuilderPage.vue')
+const ReportsPage = () => import('../pages/ReportsPage.vue')
+const AccreditationPage = () => import('../pages/AccreditationPage.vue')
 
 export default createRouter({
   history:createWebHistory(import.meta.env.BASE_URL),
