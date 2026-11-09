@@ -5,6 +5,7 @@ const authBase=(import.meta.env.BASE_URL||'/').replace(/\/$/,'')+'/api/v1/auth'
 export const useAuthStore = defineStore('auth', {
   state: () => ({
     initialized: false,
+    offlineMode: false,
     setupRequired: false,
     user: null,
     csrf: null,
@@ -18,6 +19,7 @@ export const useAuthStore = defineStore('auth', {
       this.user = data.user || null
       this.csrf = data.csrf_token || null
       this.initialized = true
+      this.offlineMode = false
       return data
     },
     async setup(payload) {
@@ -36,6 +38,7 @@ export const useAuthStore = defineStore('auth', {
       this.user = data.user
       this.csrf = data.csrf_token
       this.setupRequired = false
+      this.offlineMode = false
       return data
     },
     async login(payload) {
@@ -53,6 +56,7 @@ export const useAuthStore = defineStore('auth', {
       }
       this.user = data.user
       this.csrf = data.csrf_token
+      this.offlineMode = false
       return data
     },
     async logout() {
@@ -65,6 +69,7 @@ export const useAuthStore = defineStore('auth', {
       }
       this.user = null
       this.csrf = null
+      this.offlineMode = false
     },
   },
 })
