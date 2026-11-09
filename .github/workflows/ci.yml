@@ -20,6 +20,8 @@ jobs:
       - run: npm run test:security
       - run: npm run build
       - run: npm run test:offline-build
+      - name: Verify initial-load performance budgets
+        run: npm run test:performance
       - name: Install Chromium
         run: npx playwright install --with-deps chromium
       - name: Browser P0 regression checks
