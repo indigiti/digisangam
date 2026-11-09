@@ -1,8 +1,6 @@
 <?php
 declare(strict_types=1);
 
-require dirname(__DIR__).'/app/bootstrap.php';
-
 use DigiSangam\Core\Storage\JsonFileStore;
 
 $root=sys_get_temp_dir().'/digisangam-event-seo-'.bin2hex(random_bytes(6));
@@ -11,6 +9,7 @@ $exists=is_file($publicIndex);
 $original=$exists?file_get_contents($publicIndex):null;
 mkdir($root,0700,true);
 putenv('DIGISANGAM_STORAGE_ROOT='.$root);
+require dirname(__DIR__).'/app/bootstrap.php';
 putenv('DIGISANGAM_PUBLIC_ORIGIN=https://events.example.test');
 $_SERVER['HTTP_HOST']='events.example.test';
 $_SERVER['HTTPS']='on';
