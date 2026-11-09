@@ -18,7 +18,7 @@ async function load(){
 onMounted(load)
 watch(()=>events.currentId,load)
 </script>
-<template><div class="space-y-6">
+<template><div class="space-y-7">
 <section class="flex flex-col justify-between gap-4 xl:flex-row xl:items-end"><div><p class="eyebrow">Command Center</p><h1 class="page-title">Welcome back, {{auth.user?.name||'Administrator'}}</h1><p class="page-subtitle">Live data for the currently selected event.</p></div><RouterLink to="/events/create" class="btn-primary">+ Create Event</RouterLink></section>
 <p v-if="error" class="rounded-xl bg-rose-50 p-4 text-sm font-semibold text-rose-700">{{error}}</p>
 <section v-if="!events.currentId" class="panel p-10 text-center"><h2 class="text-xl font-black">Create your first event</h2><p class="mt-2 text-sm text-slate-500">Dashboard metrics appear after a real event has been created.</p><RouterLink to="/events/create" class="btn-primary mt-5">Create Event</RouterLink></section>
