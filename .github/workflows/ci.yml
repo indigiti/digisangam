@@ -32,6 +32,8 @@ jobs:
         run: find app public scripts tests -name '*.php' -print0 | xargs -0 -n1 php -l
       - name: PHP smoke tests
         run: php tests/smoke.php
+      - name: Authentication regression tests
+        run: php tests/auth_security.php
       - name: HTTP API E2E
         run: |
           export DIGISANGAM_STORAGE_ROOT="$RUNNER_TEMP/digisangam-e2e-storage"
