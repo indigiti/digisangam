@@ -40,3 +40,5 @@ body { color:var(--ds-ink); -webkit-font-smoothing:antialiased; }
 :where(button,a,input,select,textarea):disabled { cursor:not-allowed; }
 @media (max-width:1023px) { .app-sidebar { box-shadow:16px 0 60px rgba(4,10,24,.3); } }
 @media (prefers-reduced-motion:reduce) { html { scroll-behavior:auto; } *,*::before,*::after { animation-duration:.01ms!important; animation-iteration-count:1!important; transition-duration:.01ms!important; } }
+
+body.nav-drawer-open { overflow:hidden; }
