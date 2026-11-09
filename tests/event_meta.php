@@ -33,7 +33,8 @@ try{
             'status'=>'Draft','privacy'=>'private','description'=>'Sensitive private details',
         ],
     ]);
-    $_GET['event_id']='evt_public';
+    $_SERVER['REQUEST_URI']='/digisangam/e/evt_public?invite=private-invite';
+    $_GET['event_id']='evt_secret'; // malicious duplicate query must not override path identity.
     ob_start();include dirname(__DIR__).'/public/event-meta.php';$html=ob_get_clean();
     if(!str_contains($html,'<title>Trusted public expo | DigiSangam</title>'))throw new RuntimeException('SSR event title missing.');
     if(!str_contains($html,'rel="canonical" href="https://events.example.test/digisangam/e/evt_public"'))throw new RuntimeException('Canonical event URL missing.');
@@ -42,7 +43,8 @@ try{
     if(str_contains($html,'<script>alert(1)</script>'))throw new RuntimeException('Untrusted script in event description.');
     if(!str_contains($html,'\\u003C/script\\u003E'))throw new RuntimeException('Structured data content was not escaped.');
     http_response_code(200);
-    $_GET['event_id']='evt_secret';
+    $_SERVER['REQUEST_URI']='/digisangam/e/evt_secret?event_id=evt_public';
+    $_GET['event_id']='evt_public';
     ob_start();include dirname(__DIR__).'/public/event-meta.php';$hidden=ob_get_clean();
     if(http_response_code()!==404)throw new RuntimeException('Private event must not return HTTP 200.');
     if(!str_contains($hidden,'noindex,nofollow'))throw new RuntimeException('Private event must be noindex.');
