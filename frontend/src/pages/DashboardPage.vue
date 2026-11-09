@@ -8,12 +8,22 @@ import LineSpark from '../components/LineSpark.vue'
 
 const auth=useAuthStore(),events=useEventStore(),data=ref(null),error=ref('')
 const totalCategory=computed(()=>data.value?.categories?.reduce((n,x)=>n+Number(x.count||0),0)||0)
+let requestGeneration=0
 
 async function load(){
+  const generation=++requestGeneration
   error.value=''
-  if(!events.loaded) await events.load()
-  if(!events.currentId){data.value=null;return}
-  try{data.value=await api.dashboard(events.currentId)}catch(e){error.value=e.message}
+  data.value=null
+  try {
+    if(!events.loaded) await events.load()
+    if(generation!==requestGeneration) return
+    const eventId=events.currentId
+    if(!eventId) return
+    const response=await api.dashboard(eventId)
+    if(generation===requestGeneration && eventId===events.currentId) data.value=response
+  }catch(e){
+    if(generation===requestGeneration) error.value=e.message
+  }
 }
 onMounted(load)
 watch(()=>events.currentId,load)
