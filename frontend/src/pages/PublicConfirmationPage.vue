@@ -1,13 +1,20 @@
 <script setup>
-import { onMounted, ref } from 'vue'
+import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { useRoute } from 'vue-router'
 import { api } from '../services/api'
 import QrCredential from '../components/QrCredential.vue'
 import PublicConcierge from '../components/PublicConcierge.vue'
+import {setPageSeo,resetPageSeo} from '../services/seo'
 const route=useRoute(),data=ref(null),loading=ref(true),error=ref(''),wallet=ref(null),walletBusy=ref(false),retryBusy=ref(false)
+const paymentSettled=computed(()=>!data.value?.order || data.value.order.status==='paid' || Number(data.value.order.amount||0)===0)
+const confirmed=computed(()=>data.value?.attendee?.status==='Confirmed' && paymentSettled.value)
 const money=(n,currency='INR')=>new Intl.NumberFormat('en-IN',{style:'currency',currency,maximumFractionDigits:0}).format(Number(n||0))
 async function reload(){data.value=await api.publicConfirmation(route.params.token)}
-onMounted(async()=>{try{await reload()}catch(e){error.value=e.message}finally{loading.value=false}})
+onMounted(async()=>{
+  setPageSeo({title:'Your registration | DigiSangam',robots:'noindex,nofollow'})
+  try{await reload()}catch(e){error.value=e.message}finally{loading.value=false}
+})
+onUnmounted(resetPageSeo)
 function printDocument(){window.print()}
 function loadRazorpay(){
   return new Promise((resolve,reject)=>{
@@ -60,14 +67,14 @@ async function issueWallet(platform){
     <div v-else-if="error" class="rounded-[28px] border border-rose-100 bg-white p-10 text-center"><div class="mx-auto grid h-14 w-14 place-items-center rounded-full bg-rose-50 font-black text-rose-600">!</div><h1 class="mt-4 text-2xl font-black">Confirmation unavailable</h1><p class="mt-2 text-sm text-slate-500">{{error}}</p></div>
     <template v-else-if="data">
       <section class="print-card overflow-hidden rounded-[28px] border border-slate-200 bg-white shadow-sm">
-        <div class="bg-slate-950 p-7 text-white sm:p-9"><div class="flex flex-wrap items-center gap-2"><span class="rounded-full px-3 py-1.5 text-xs font-black" :class="data.attendee.status==='Confirmed'?'bg-emerald-400/15 text-emerald-300':'bg-amber-400/15 text-amber-300'">{{data.attendee.status}}</span><span v-if="data.order" class="rounded-full bg-white/10 px-3 py-1.5 text-xs font-black">{{data.order.status==='paid'?'Payment paid':'Payment '+data.order.status}}</span></div><h1 class="mt-5 text-3xl font-black tracking-tight">{{data.attendee.status==='Confirmed'?'You’re registered.':'Registration received.'}}</h1><p class="mt-2 text-sm text-slate-300">{{data.event?.name}}</p></div>
+        <div class="bg-slate-950 p-7 text-white sm:p-9"><div class="flex flex-wrap items-center gap-2"><span class="rounded-full px-3 py-1.5 text-xs font-black" :class="data.attendee.status==='Confirmed'?'bg-emerald-400/15 text-emerald-300':'bg-amber-400/15 text-amber-300'">{{data.attendee.status}}</span><span v-if="data.order" class="rounded-full bg-white/10 px-3 py-1.5 text-xs font-black">{{data.order.status==='paid'?'Payment paid':'Payment '+data.order.status}}</span></div><h1 class="mt-5 text-3xl font-black tracking-tight">{{confirmed?'You’re registered.':!paymentSettled?'Payment awaiting confirmation.':'Registration received.'}}</h1><p class="mt-2 text-sm text-slate-300">{{data.event?.name}}</p></div>
         <div class="grid gap-7 p-7 sm:p-9 md:grid-cols-[1fr_250px]">
           <div>
             <p class="text-xs font-black uppercase tracking-widest text-slate-400">Attendee</p><h2 class="mt-2 text-xl font-black">{{data.attendee.name}}</h2><p class="mt-1 text-sm text-slate-500">{{data.attendee.email}}</p>
             <div class="mt-6 grid gap-3 rounded-2xl bg-slate-50 p-5 text-sm"><div class="flex justify-between gap-4"><span class="text-slate-500">Ticket</span><b>{{data.ticket?.name||'—'}}</b></div><div class="flex justify-between gap-4"><span class="text-slate-500">Category</span><b>{{data.attendee.category}}</b></div><div class="flex justify-between gap-4"><span class="text-slate-500">Registration ID</span><b class="font-mono text-xs">{{data.attendee.id}}</b></div><div class="flex justify-between gap-4"><span class="text-slate-500">Venue</span><b class="text-right">{{data.event?.location}}</b></div><div v-if="data.order" class="flex justify-between gap-4"><span class="text-slate-500">Payment</span><b>{{data.order.status}}</b></div></div>
-            <p v-if="!data.credential" class="mt-5 rounded-2xl bg-amber-50 p-4 text-sm leading-6 text-amber-800">Your QR credential has not been issued yet. Payment or organizer approval is still pending. This confirmation link remains valid and will show the QR after the state changes.</p><button v-if="['expired','failed'].includes(data.order?.status)" class="no-print mt-3 w-full rounded-xl bg-indigo-600 px-4 py-3 text-sm font-black text-white disabled:opacity-50" :disabled="retryBusy" @click="retryPayment">{{retryBusy?'Preparing payment…':'Retry payment'}}</button>
+            <p v-if="!data.credential||!confirmed" class="mt-5 rounded-2xl bg-amber-50 p-4 text-sm leading-6 text-amber-800">Your QR credential has not been issued yet. Payment or organizer approval is still pending. Only the verified payment and confirmation state can issue a usable QR.</p><button v-if="['expired','failed'].includes(data.order?.status)" class="no-print mt-3 w-full rounded-xl bg-indigo-600 px-4 py-3 text-sm font-black text-white disabled:opacity-50" :disabled="retryBusy" @click="retryPayment">{{retryBusy?'Preparing payment…':'Retry payment'}}</button>
           </div>
-          <div v-if="data.credential"><p class="mb-3 text-center text-xs font-black uppercase tracking-widest text-slate-400">Entry QR</p><QrCredential :value="data.credential.payload"/><p class="mt-3 text-center text-xs leading-5 text-slate-400">Present this QR at event check-in.</p></div>
+          <div v-if="data.credential&&confirmed"><p class="mb-3 text-center text-xs font-black uppercase tracking-widest text-slate-400">Entry QR</p><QrCredential :value="data.credential.payload"/><p class="mt-3 text-center text-xs leading-5 text-slate-400">Present this QR at event check-in.</p></div>
         </div>
       </section>
 

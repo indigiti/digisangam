@@ -3,12 +3,14 @@ import { createPinia } from 'pinia'
 import App from './App.vue'
 import router from './router'
 import { useAuthStore } from './stores/auth'
+import { useThemeStore } from './stores/theme'
 import { offlineStore } from './services/offline'
 import './style.css'
 
 const app=createApp(App)
 const pinia=createPinia()
 const auth=useAuthStore(pinia)
+useThemeStore(pinia).initialize()
 
 router.beforeEach(async(to)=>{
   if(!auth.initialized){

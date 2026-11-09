@@ -20,6 +20,8 @@ jobs:
       - run: npm run test:security
       - run: npm run build
       - run: npm run test:offline-build
+      - name: Verify initial-load performance budgets
+        run: npm run test:performance
       - name: Install Chromium
         run: npx playwright install --with-deps chromium
       - name: Browser P0 regression checks
@@ -48,6 +50,8 @@ jobs:
         run: php tests/smoke.php
       - name: Authentication regression tests
         run: php tests/auth_security.php
+      - name: Public event HTML metadata and privacy tests
+        run: php tests/event_meta.php
       - name: HTTP API E2E
         run: |
           export DIGISANGAM_STORAGE_ROOT="$RUNNER_TEMP/digisangam-e2e-storage"

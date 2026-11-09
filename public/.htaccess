@@ -7,6 +7,10 @@ RewriteBase /digisangam/
 RewriteRule ^api/v1/?$ api/index.php?path= [QSA,L]
 RewriteRule ^api/v1/(.*)$ api/index.php?path=$1 [QSA,L]
 
+# Only public event landing pages receive server-side metadata.
+# Confirmation links and admin routes stay in the SPA fallback.
+RewriteRule ^e/([A-Za-z0-9_-]+)/?$ event-meta.php?event_id=$1 [QSA,L]
+
 RewriteRule ^$ index.html [L]
 RewriteCond %{REQUEST_FILENAME} !-f
 RewriteCond %{REQUEST_FILENAME} !-d
