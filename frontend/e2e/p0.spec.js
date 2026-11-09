@@ -174,7 +174,7 @@ test('P0 legacy queued check-ins survive encryption migration, passphrase renewa
   // New passphrase must rewrap pending check-ins without clearing the queue.
   await page.getByPlaceholder('Set offline passphrase (10+ characters)').fill(newPass)
   await page.getByRole('button',{name:'Prepare / Re-sync'}).click()
-  expect((await storage()).ciphertext).not.toEqual(encrypted.ciphertext)
+  await expect.poll(async()=> (await storage()).ciphertext,{timeout:15000}).not.toEqual(encrypted.ciphertext)
   await page.reload()
   await expect(page.getByPlaceholder('Offline passphrase',{exact:true})).toBeVisible()
   await page.getByPlaceholder('Offline passphrase',{exact:true}).fill(newPass)
