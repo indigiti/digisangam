@@ -129,3 +129,21 @@ html[data-theme="dark"] .app-bg .data-table td { border-color:#293750;color:#c2c
 html[data-theme="dark"] .app-bg .premium-action { background:#1b2740;border-color:#304058; }
 html[data-theme="dark"] .app-bg .stat-card { background:#1a2740; }
 html[data-theme="dark"] .app-bg .icon-btn:hover { background:#283650;border-color:#43536d; }
+
+
+/* Public event accents are scoped to the individual event, not admin UI. */
+.public-event { --event-accent:#6154dc; --event-accent-contrast:#fff; color:#20283b; }
+.public-event .event-primary { background:var(--event-accent);color:var(--event-accent-contrast)!important;transition:filter .16s ease,transform .16s ease; }
+.public-event button.event-primary:not(:disabled):hover,
+.public-event a.event-primary:hover { filter:brightness(.94);transform:translateY(-1px); }
+.public-event .event-text { color:var(--event-accent); }
+.public-event .event-border { border-color:var(--event-accent); }
+.public-event :where(button,input,select,textarea,a):focus-visible { outline:2px solid var(--event-accent);outline-offset:3px; }
+.public-event [id="registration-flow"] { scroll-margin-top:72px; }
+.public-event #registration-flow [class*="bg-white"] { min-width:0; }
+.public-event .public-ticket-price { font-variant-numeric:tabular-nums; }
+@media (prefers-reduced-motion:reduce) {
+  .public-event .event-primary { transition:none; }
+  .public-event button.event-primary:not(:disabled):hover,
+  .public-event a.event-primary:hover { transform:none; }
+}
