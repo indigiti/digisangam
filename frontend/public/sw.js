@@ -18,7 +18,7 @@ self.addEventListener('install', event => {
     }
     const paths = [appPath('/onground'), appPath('/manifest.webmanifest'), appPath('/offline-precache.json')]
     for (const asset of manifest.assets) {
-      if (!/^\\/assets\\/[A-Za-z0-9_./-]+$/.test(asset)) throw new Error('Invalid offline asset path.')
+      if (!asset.startsWith('/assets/') || asset.includes('..') || !/^[A-Za-z0-9/._-]+$/.test(asset)) throw new Error('Invalid offline asset path.')
       paths.push(appPath(asset))
     }
     const cache = await caches.open(CACHE)
