@@ -1,5 +1,5 @@
 <script setup>
-import { ref, watch } from 'vue'
+import { ref, watch, nextTick } from 'vue'
 import { useRoute } from 'vue-router'
 import { computed } from 'vue'
 import { useAuthStore } from '../stores/auth'
@@ -10,7 +10,12 @@ const route = useRoute()
 const auth = useAuthStore()
 const offlineShell = computed(() => !auth.user && auth.offlineMode && route.name === 'onground')
 const mobileNavOpen = ref(false)
-watch(() => route.fullPath, () => { mobileNavOpen.value = false })
+function closeNav() {
+  const wasOpen = mobileNavOpen.value
+  mobileNavOpen.value = false
+  if (wasOpen) nextTick(() => document.querySelector('[aria-label="Toggle navigation menu"]')?.focus())
+}
+watch(() => route.fullPath, closeNav)
 </script>
 
 <template>
@@ -26,7 +31,7 @@ watch(() => route.fullPath, () => { mobileNavOpen.value = false })
       </main>
     </template>
     <template v-else>
-      <SidebarNav :open="mobileNavOpen" @close="mobileNavOpen = false" />
+      <SidebarNav :open="mobileNavOpen" @close="closeNav" />
       <div class="min-w-0 lg:pl-64">
         <Topbar :mobile-nav-open="mobileNavOpen" @toggle-menu="mobileNavOpen = !mobileNavOpen" />
         <main id="main-content" tabindex="-1" class="mx-auto w-full max-w-[1800px] px-4 py-6 sm:px-6 lg:px-8 lg:py-8">
