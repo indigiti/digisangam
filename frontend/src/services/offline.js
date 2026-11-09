@@ -77,11 +77,43 @@ function isActive(payload) {
   return payload?.version === 3 && Date.parse(payload.expires_at || '') > Date.now()
 }
 
+async function prepareQueueMigration(eventId, newKey, priorKey = null) {
+  const records = await all(STORE_QUEUE)
+  const rewrites = []
+  for (const row of records) {
+    if (row.event_id !== eventId) continue
+    if (row.format === 3) {
+      if (!priorKey) throw new Error('Unlock the previous offline snapshot before replacing one with queued check-ins.')
+      const item = await decryptQueueItem(row, priorKey)
+      rewrites.push(await encryptQueueItem(item, newKey))
+    } else {
+      // Require real legacy credential records; never discard unsynchronized data.
+      if (typeof row.local_id !== 'string' || typeof row.payload !== 'string' ||
+          typeof row.attendee_id !== 'string') {
+        throw new Error('Legacy check-in records need manual reconciliation before snapshot replacement.')
+      }
+      rewrites.push(await encryptQueueItem(row, newKey))
+    }
+  }
+  return rewrites
+}
+
+async function commitSnapshotWithQueue(snapshotRecord, queueRewrites) {
+  const db = await openDb()
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction([STORE_SNAPSHOTS, STORE_QUEUE], 'readwrite')
+    tx.objectStore(STORE_SNAPSHOTS).put(snapshotRecord)
+    for (const record of queueRewrites) tx.objectStore(STORE_QUEUE).put(record)
+    tx.oncomplete = () => { db.close(); resolve() }
+    tx.onabort = () => { db.close(); reject(tx.error || new Error('Offline transaction was aborted.')) }
+    tx.onerror = () => { db.close(); reject(tx.error) }
+  })
+}
+
 async function migrateQueue(eventId, key) {
   const rows = await all(STORE_QUEUE)
   for (const row of rows) {
     if (row.event_id !== eventId || row.format === 3) continue
-    // Legacy v2 entries stay recoverable, but are re-encrypted before reuse.
     if (typeof row.local_id !== 'string' || typeof row.payload !== 'string' ||
         typeof row.attendee_id !== 'string') continue
     await put(STORE_QUEUE, await encryptQueueItem(row, key))
@@ -91,10 +123,18 @@ async function migrateQueue(eventId, key) {
 export const offlineStore = {
   async saveSnapshot(document, passphrase) {
     const { record, payload, key } = await encryptSnapshot(document, passphrase)
-    await put(STORE_SNAPSHOTS, record)
+    const priorSnapshot = await get(STORE_SNAPSHOTS, payload.event_id)
+    const pending = (await all(STORE_QUEUE)).some(row => row.event_id === payload.event_id && row.format === 3)
+    let priorKey = sessionKeys.get(payload.event_id) || null
+    if (pending && !priorKey && priorSnapshot?.format === 3) {
+      // The previous passphrase must be supplied to safely migrate pending records.
+      const prior = await decryptSnapshot(priorSnapshot, passphrase)
+      priorKey = prior.key
+    }
+    const rewrites = await prepareQueueMigration(payload.event_id, key, priorKey)
+    await commitSnapshotWithQueue(record, rewrites)
     unlocked.set(payload.event_id, payload)
     sessionKeys.set(payload.event_id, key)
-    await migrateQueue(payload.event_id, key)
     return payload
   },
 
