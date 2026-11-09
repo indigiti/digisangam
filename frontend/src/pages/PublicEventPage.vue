@@ -12,7 +12,7 @@ const answers=reactive({}),honeypot=ref(''),uploadingField=ref('')
 const money=n=>Number(n||0)===0?'Free':new Intl.NumberFormat('en-IN',{style:'currency',currency:data.value?.event?.currency||'INR',maximumFractionDigits:0}).format(n)
 const selected=computed(()=>data.value?.tickets?.find(x=>x.id===selectedTicket.value)||null)
 const fields=computed(()=>data.value?.registration?.fields||[])
-const startingPrice=computed(()=>{const prices=(data.value?.tickets||[]).map(t=>Number(t.price||0));return prices.length?Math.min(...prices):0})
+const startingPrice=computed(()=>{const prices=(data.value?.tickets||[]).map(t=>Number(t.price||0));return prices.length?Math.min(...prices):null})
 const ticketRemaining=ticket=>Math.max(0,Number(ticket?.quantity||0)-Number(ticket?.sold||0)-Number(ticket?.reserved||0))
 const validAccent=value=>/^#[0-9a-fA-F]{6}$/.test(String(value||''))?String(value):'#6154dc'
 const accent=computed(()=>validAccent(data.value?.event?.branding?.primary_color))
@@ -75,7 +75,7 @@ async function loadEvent(){
       if(fields.value.some(x=>x.id==='fld_category')&&invite.category) answers.fld_category=invite.category
     }
     updatePageMetadata(payload.event)
-  }catch(e){if(generation===loadGeneration)error.value=e.message}
+  }catch(e){if(generation===loadGeneration){error.value=e.message;data.value=null}}
   finally{if(generation===loadGeneration)loading.value=false}
 }
 watch(()=>[route.params.id,route.query.invite,previewMode.value],loadEvent,{immediate:true})
@@ -212,7 +212,7 @@ async function submit(){
         <aside class="hidden lg:block">
           <div class="rounded-[20px] bg-white p-5 text-slate-900 shadow-[0_16px_45px_rgba(3,7,30,.22)]">
             <p class="text-[10px] font-black uppercase tracking-[.14em] text-slate-400">Tickets from</p>
-            <p class="mt-1 text-[24px] font-black">{{money(startingPrice,data.event.currency)}}</p>
+            <p class="mt-1 text-[24px] font-black">{{(startingPrice===null?'Tickets TBA':money(startingPrice))}}</p>
             <p class="mt-2 text-[11px] leading-5 text-slate-500">{{data.tickets.length}} ticket type{{data.tickets.length===1?'':'s'}} available</p>
             <button class="mt-5 w-full rounded-[8px] event-primary px-4 py-3 text-[12px] font-black text-white" @click="scrollToRegistration">Book / Register</button>
           </div>
@@ -305,7 +305,7 @@ async function submit(){
     </section>
 
     <div class="fixed inset-x-0 bottom-0 z-40 border-t border-slate-200 bg-white p-3 shadow-[0_-8px_30px_rgba(15,23,42,.08)] lg:hidden">
-      <div class="mx-auto flex max-w-lg items-center justify-between gap-3"><div><p class="text-[9px] font-black uppercase text-slate-400">{{selected?'Selected ticket':'Tickets from'}}</p><p class="text-[13px] font-black">{{selected?selected.name:money(startingPrice,data.event.currency)}}</p></div><button class="rounded-[8px] event-primary px-5 py-3 text-[12px] font-black text-white" @click="scrollToRegistration">{{selected?'Continue':'Book now'}}</button></div>
+      <div class="mx-auto flex max-w-lg items-center justify-between gap-3"><div><p class="text-[9px] font-black uppercase text-slate-400">{{selected?'Selected ticket':'Tickets from'}}</p><p class="text-[13px] font-black">{{selected?selected.name:(startingPrice===null?'Tickets TBA':money(startingPrice))}}</p></div><button class="rounded-[8px] event-primary px-5 py-3 text-[12px] font-black text-white" @click="scrollToRegistration">{{selected?'Continue':'Book now'}}</button></div>
     </div>
   </template>
 </main>
