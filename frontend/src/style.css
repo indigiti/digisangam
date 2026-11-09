@@ -147,3 +147,9 @@ html[data-theme="dark"] .app-bg .icon-btn:hover { background:#283650;border-colo
   .public-event button.event-primary:not(:disabled):hover,
   .public-event a.event-primary:hover { transform:none; }
 }
+
+.ds-button-ghost { min-height:40px;border-radius:11px;padding:.65rem 1rem;color:var(--ds-muted);background:transparent; }
+.ds-button-ghost:hover { background:var(--ds-surface-alt);color:var(--ds-text); }
+.ds-loader { width:15px;height:15px;border:2px solid currentColor;border-bottom-color:transparent;border-radius:50%;animation:ds-spin .7s linear infinite; }
+@keyframes ds-spin { to { transform:rotate(360deg); } }
+@media (prefers-reduced-motion:reduce) { .ds-loader { animation:none; } }
