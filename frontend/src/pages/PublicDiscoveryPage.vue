@@ -21,7 +21,8 @@ const categories=computed(()=>['All',...(payload.value.categories||[])])
 const locations=computed(()=>['All',...(payload.value.locations||[])])
 const topPicks=computed(()=>filtered.value.slice(0,8))
 const remaining=computed(()=>filtered.value.slice(8))
-const featured=computed(()=>filtered.value[0]||events.value[0]||null)
+const filteredActive=computed(()=>!!query.value||category.value!=='All'||location.value!=='All'||dateFilter.value!=='All')
+const featured=computed(()=>filtered.value[0]||(!filteredActive.value?events.value[0]:null))
 
 const categoryTiles=computed(()=>{
   const palette=[
@@ -122,7 +123,7 @@ function reset(){query.value='';category.value='All';location.value='All';dateFi
             <div class="flex items-center gap-2"><span class="rounded-full bg-[#6154dc] px-3 py-1 text-[12px] font-black uppercase tracking-[.14em]">Featured</span><span class="rounded-full bg-white/10 px-3 py-1 text-[12px] font-bold">{{featured.category}}</span></div>
             <h1 class="mt-4 max-w-[560px] text-[32px] font-extrabold leading-[1.08] tracking-[-.045em] sm:text-[48px]">{{featured.headline||featured.name}}</h1>
             <p class="mt-3 max-w-[520px] line-clamp-2 text-[13px] leading-6 text-slate-300">{{featured.description||'Discover and register for this experience on DigiSangam.'}}</p>
-            <div class="mt-5 flex flex-wrap items-center gap-3 text-[12px] font-semibold text-white/85"><span>{{fullDate(featured.start_date)}}</span><span class="text-white/35">•</span><span>{{featured.location||'Location TBA'}}</span><span class="text-white/35">•</span><b>{{money(featured.min_price,featured.currency)}} onwards</b></div>
+            <div class="mt-5 flex flex-wrap items-center gap-3 text-[12px] font-semibold text-white/85"><span>{{fullDate(featured.start_date)}}</span><span class="text-white/35">•</span><span>{{featured.location||'Location TBA'}}</span><span class="text-white/35">•</span><b>{{(Number(featured.ticket_count||0)>0?money(featured.min_price,featured.currency):'Tickets TBA')}} onwards</b></div>
           </div>
         </RouterLink>
       </div>
@@ -167,7 +168,7 @@ function reset(){query.value='';category.value='All';location.value='All';dateFi
           <div class="pt-3">
             <h3 class="line-clamp-2 text-[14px] font-black leading-[1.35] tracking-[-.01em] text-[#222733] group-hover:text-[#6154dc]">{{event.name}}</h3>
             <p class="mt-1.5 truncate text-[12px] font-medium text-slate-500">{{event.location||'Location TBA'}}</p>
-            <p class="mt-1 text-[12px] text-slate-400">{{event.type}} · <b class="font-semibold text-slate-600">{{money(event.min_price,event.currency)}} onwards</b></p>
+            <p class="mt-1 text-[12px] text-slate-400">{{event.type}} · <b class="font-semibold text-slate-600">{{(Number(event.ticket_count||0)>0?money(event.min_price,event.currency):'Tickets TBA')}} onwards</b></p>
           </div>
         </RouterLink>
       </div>
