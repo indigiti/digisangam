@@ -271,6 +271,18 @@ try{
     $snapshot=(new OfflineSnapshotService($attendees,$tickets,$venueRepo,$sessionRepo,$badgeRepo,'test-secret'))->build($eventId);
     expect(count($snapshot['credentials'])===1,'Offline snapshot must contain confirmed attendees only.');
     expect(($snapshot['credentials'][0]['payload']??'')===$issued['payload'],'Offline credential mismatch.');
+    expect(($snapshot['version']??0)===3,'Offline snapshot must use signed version 3.');
+    expect(($snapshot['signature_algorithm']??'')==='Ed25519','Offline snapshot must use asymmetric signatures.');
+    $signedBytes=base64_decode((string)($snapshot['signed_payload']??''),true);
+    $publicKey=base64_decode((string)($snapshot['signing_public_key']??''),true);
+    $signature=base64_decode((string)($snapshot['signature']??''),true);
+    expect($signedBytes!==false&&$publicKey!==false&&$signature!==false,'Offline snapshot encoding must be valid.');
+    expect(sodium_crypto_sign_verify_detached($signature,$signedBytes,$publicKey),'Offline snapshot must verify using its public key.');
+    $signedDecoded=json_decode($signedBytes,true);
+    expect(($signedDecoded['event_id']??'')===$eventId,'Signed snapshot event mismatch.');
+    expect(($signedDecoded['credentials'][0]['payload']??'')===$issued['payload'],'Signed credential mismatch.');
+    expect(strtotime((string)$signedDecoded['expires_at'])>time(),'Offline snapshot must have a future expiry.');
+    expect(!sodium_crypto_sign_verify_detached($signature,$signedBytes.'tampered',$publicKey),'Offline snapshot tampering must be rejected.');
 
     // Communications and automation.
     $outbox=new NotificationOutbox($store);

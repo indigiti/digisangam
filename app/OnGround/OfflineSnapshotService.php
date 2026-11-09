@@ -40,12 +40,25 @@ final class OfflineSnapshotService
             ];
         }
         $snapshot=[
-            'version'=>2,'event_id'=>$eventId,'generated_at'=>date(DATE_ATOM),
+            'version'=>3,'event_id'=>$eventId,'generated_at'=>date(DATE_ATOM),
+            'expires_at'=>date(DATE_ATOM,time()+48*3600),
             'attendees'=>$attendees,'credentials'=>$credentials,'tickets'=>$tickets,
             'venue'=>$this->venue->get($eventId),'sessions'=>$sessions,'badges'=>$badges,
         ];
+        // An offline browser cannot verify an HMAC without exposing the server secret.
+        // Derive a separate Ed25519 signing key from the stable credential secret.
+        // The browser verifies the exact signed bytes (signed_payload) before use.
+        if(!function_exists('sodium_crypto_sign_seed_keypair')){
+            throw new \RuntimeException('Sodium is required for verifiable offline snapshots.');
+        }
+        $seed=hash('sha256','digisangam/offline-v3|'.$this->secret,true);
+        $pair=sodium_crypto_sign_seed_keypair($seed);
+        $snapshot['signing_public_key']=base64_encode(sodium_crypto_sign_publickey($pair));
         $canonical=json_encode($snapshot,JSON_UNESCAPED_SLASHES|JSON_UNESCAPED_UNICODE|JSON_THROW_ON_ERROR);
-        $snapshot['signature']=hash_hmac('sha256',$canonical,$this->secret);
-        return $snapshot;
+        return $snapshot + [
+            'signature_algorithm'=>'Ed25519',
+            'signed_payload'=>base64_encode($canonical),
+            'signature'=>base64_encode(sodium_crypto_sign_detached($canonical,sodium_crypto_sign_secretkey($pair))),
+        ];
     }
 }

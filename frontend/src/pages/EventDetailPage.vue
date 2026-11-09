@@ -1,5 +1,5 @@
 <script setup>
-import {onMounted,reactive,ref} from 'vue'
+import {watch,reactive,ref} from 'vue'
 import {useRoute} from 'vue-router'
 import {api} from '../services/api'
 import {useEventStore} from '../stores/event'
@@ -7,7 +7,22 @@ import {useEventStore} from '../stores/event'
 const route=useRoute(),events=useEventStore(),busy=ref(false),saved=ref(false),loading=ref(true),error=ref(''),uploading=ref('')
 const form=reactive({id:'',name:'',description:'',type:'Conference',category:'Business',format:'in_person',start_date:'',end_date:'',timezone:'Asia/Kolkata',location:'',venue_name:'',website:'',currency:'INR',privacy:'public',status:'Draft',branding:{},organizer:{},public_page:{}})
 
-onMounted(async()=>{try{const data=await api.event(route.params.id);Object.assign(form,data);form.branding={primary_color:'#4f46e5',secondary_color:'#06b6d4',background_color:'#0f172a',brand_name:'',logo_url:'',poster_url:'',cover_url:'',...(data.branding||{})};form.organizer={name:'',email:'',phone:'',...(data.organizer||{})};form.public_page={headline:'',show_location:true,show_organizer:true,...(data.public_page||{})};events.select(data.id)}catch(e){error.value=e.message}finally{loading.value=false}})
+let loadGeneration=0
+async function loadEvent(id){
+  const generation=++loadGeneration
+  loading.value=true;error.value='';saved.value=false
+  try{
+    const data=await api.event(id)
+    if(generation!==loadGeneration||String(route.params.id)!==String(id)) return
+    Object.assign(form,data)
+    form.branding={primary_color:'#4f46e5',secondary_color:'#06b6d4',background_color:'#0f172a',brand_name:'',logo_url:'',poster_url:'',cover_url:'',...(data.branding||{})}
+    form.organizer={name:'',email:'',phone:'',...(data.organizer||{})}
+    form.public_page={headline:'',show_location:true,show_organizer:true,...(data.public_page||{})}
+    events.select(data.id)
+  }catch(e){if(generation===loadGeneration)error.value=e.message}
+  finally{if(generation===loadGeneration)loading.value=false}
+}
+watch(()=>route.params.id,id=>{if(id)loadEvent(id)},{immediate:true})
 async function save(){busy.value=true;saved.value=false;error.value='';try{Object.assign(form,await api.updateEvent(form.id,form));saved.value=true;await events.load()}catch(e){error.value=e.message}finally{busy.value=false}}
 async function uploadBrand(kind,file){
   if(!file)return

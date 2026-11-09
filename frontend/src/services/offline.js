@@ -1,74 +1,207 @@
-const DB_NAME='digisangam-onground'
-const DB_VERSION=1
-const STORE_SNAPSHOTS='snapshots'
-const STORE_QUEUE='checkin_queue'
+import {
+  encryptSnapshot, decryptSnapshot, encryptQueueItem, decryptQueueItem,
+} from './offlineSecurity'
 
-function openDb(){
-  return new Promise((resolve,reject)=>{
-    const request=indexedDB.open(DB_NAME,DB_VERSION)
-    request.onupgradeneeded=()=>{
-      const db=request.result
-      if(!db.objectStoreNames.contains(STORE_SNAPSHOTS)) db.createObjectStore(STORE_SNAPSHOTS,{keyPath:'event_id'})
-      if(!db.objectStoreNames.contains(STORE_QUEUE)) db.createObjectStore(STORE_QUEUE,{keyPath:'local_id'})
+const DB_NAME = 'digisangam-onground'
+const DB_VERSION = 2
+const STORE_SNAPSHOTS = 'snapshots'
+const STORE_QUEUE = 'checkin_queue'
+const unlocked = new Map()
+const sessionKeys = new Map()
+
+function openDb() {
+  return new Promise((resolve, reject) => {
+    const request = indexedDB.open(DB_NAME, DB_VERSION)
+    request.onupgradeneeded = () => {
+      const db = request.result
+      if (!db.objectStoreNames.contains(STORE_SNAPSHOTS)) db.createObjectStore(STORE_SNAPSHOTS, { keyPath: 'event_id' })
+      if (!db.objectStoreNames.contains(STORE_QUEUE)) db.createObjectStore(STORE_QUEUE, { keyPath: 'local_id' })
     }
-    request.onsuccess=()=>resolve(request.result)
-    request.onerror=()=>reject(request.error)
+    request.onsuccess = () => resolve(request.result)
+    request.onerror = () => reject(request.error)
   })
 }
-async function put(store,value){
-  const db=await openDb()
-  return new Promise((resolve,reject)=>{
-    const tx=db.transaction(store,'readwrite')
+
+async function put(store, value) {
+  const db = await openDb()
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(store, 'readwrite')
     tx.objectStore(store).put(value)
-    tx.oncomplete=()=>{db.close();resolve(value)}
-    tx.onerror=()=>{db.close();reject(tx.error)}
+    tx.oncomplete = () => { db.close(); resolve(value) }
+    tx.onerror = () => { db.close(); reject(tx.error) }
+    tx.onabort = () => { db.close(); reject(tx.error || new Error('Offline storage write aborted.')) }
   })
 }
-async function get(store,key){
-  const db=await openDb()
-  return new Promise((resolve,reject)=>{
-    const tx=db.transaction(store,'readonly')
-    const req=tx.objectStore(store).get(key)
-    req.onsuccess=()=>{db.close();resolve(req.result||null)}
-    req.onerror=()=>{db.close();reject(req.error)}
+
+async function get(store, key) {
+  const db = await openDb()
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(store, 'readonly')
+    const request = tx.objectStore(store).get(key)
+    request.onsuccess = () => { db.close(); resolve(request.result || null) }
+    request.onerror = () => { db.close(); reject(request.error) }
   })
 }
-async function all(store){
-  const db=await openDb()
-  return new Promise((resolve,reject)=>{
-    const tx=db.transaction(store,'readonly')
-    const req=tx.objectStore(store).getAll()
-    req.onsuccess=()=>{db.close();resolve(req.result||[])}
-    req.onerror=()=>{db.close();reject(req.error)}
+
+async function all(store) {
+  const db = await openDb()
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(store, 'readonly')
+    const request = tx.objectStore(store).getAll()
+    request.onsuccess = () => { db.close(); resolve(request.result || []) }
+    request.onerror = () => { db.close(); reject(request.error) }
   })
 }
-async function remove(store,key){
-  const db=await openDb()
-  return new Promise((resolve,reject)=>{
-    const tx=db.transaction(store,'readwrite')
+
+async function remove(store, key) {
+  const db = await openDb()
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(store, 'readwrite')
     tx.objectStore(store).delete(key)
-    tx.oncomplete=()=>{db.close();resolve()}
-    tx.onerror=()=>{db.close();reject(tx.error)}
+    tx.oncomplete = () => { db.close(); resolve() }
+    tx.onerror = () => { db.close(); reject(tx.error) }
   })
 }
 
-function validateSnapshot(snapshot){
-  if(!snapshot||typeof snapshot!=='object') throw new Error('Invalid offline snapshot.')
-  if(!snapshot.event_id||!snapshot.signature||!Array.isArray(snapshot.credentials)) throw new Error('Offline snapshot is incomplete.')
-  if(Number(snapshot.version||0)<2) throw new Error('Offline snapshot version is unsupported.')
-  return snapshot
+async function clear(store) {
+  const db = await openDb()
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(store, 'readwrite')
+    tx.objectStore(store).clear()
+    tx.oncomplete = () => { db.close(); resolve() }
+    tx.onerror = () => { db.close(); reject(tx.error) }
+  })
 }
 
-export const offlineStore={
-  saveSnapshot:snapshot=>put(STORE_SNAPSHOTS,{...validateSnapshot(snapshot),saved_at:new Date().toISOString()}),
-  snapshot:eventId=>get(STORE_SNAPSHOTS,eventId),
-  queued:()=>all(STORE_QUEUE),
-  queueCheckin:item=>put(STORE_QUEUE,item),
-  removeQueued:id=>remove(STORE_QUEUE,id),
-  async findCredential(eventId,payload){
-    const snapshot=await get(STORE_SNAPSHOTS,eventId)
-    if(!snapshot) return null
-    try{validateSnapshot(snapshot)}catch{return null}
-    return snapshot.credentials.find(x=>x.payload===payload)||null
+function isActive(payload) {
+  return payload?.version === 3 && Date.parse(payload.expires_at || '') > Date.now()
+}
+
+async function prepareQueueMigration(eventId, newKey, priorKey = null) {
+  const records = await all(STORE_QUEUE)
+  const rewrites = []
+  for (const row of records) {
+    if (row.event_id !== eventId) continue
+    if (row.format === 3) {
+      if (!priorKey) throw new Error('Unlock the previous offline snapshot before replacing one with queued check-ins.')
+      const item = await decryptQueueItem(row, priorKey)
+      rewrites.push(await encryptQueueItem(item, newKey))
+    } else {
+      // Require real legacy credential records; never discard unsynchronized data.
+      if (typeof row.local_id !== 'string' || typeof row.payload !== 'string' ||
+          typeof row.attendee_id !== 'string') {
+        throw new Error('Legacy check-in records need manual reconciliation before snapshot replacement.')
+      }
+      rewrites.push(await encryptQueueItem(row, newKey))
+    }
+  }
+  return rewrites
+}
+
+async function commitSnapshotWithQueue(snapshotRecord, queueRewrites) {
+  const db = await openDb()
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction([STORE_SNAPSHOTS, STORE_QUEUE], 'readwrite')
+    tx.objectStore(STORE_SNAPSHOTS).put(snapshotRecord)
+    for (const record of queueRewrites) tx.objectStore(STORE_QUEUE).put(record)
+    tx.oncomplete = () => { db.close(); resolve() }
+    tx.onabort = () => { db.close(); reject(tx.error || new Error('Offline transaction was aborted.')) }
+    tx.onerror = () => { db.close(); reject(tx.error) }
+  })
+}
+
+async function migrateQueue(eventId, key) {
+  const rows = await all(STORE_QUEUE)
+  for (const row of rows) {
+    if (row.event_id !== eventId || row.format === 3) continue
+    if (typeof row.local_id !== 'string' || typeof row.payload !== 'string' ||
+        typeof row.attendee_id !== 'string') continue
+    await put(STORE_QUEUE, await encryptQueueItem(row, key))
+  }
+}
+
+export const offlineStore = {
+  async saveSnapshot(document, passphrase) {
+    const { record, payload, key } = await encryptSnapshot(document, passphrase)
+    const priorSnapshot = await get(STORE_SNAPSHOTS, payload.event_id)
+    const pending = (await all(STORE_QUEUE)).some(row => row.event_id === payload.event_id && row.format === 3)
+    let priorKey = sessionKeys.get(payload.event_id) || null
+    if (pending && !priorKey && priorSnapshot?.format === 3) {
+      // The previous passphrase must be supplied to safely migrate pending records.
+      const prior = await decryptSnapshot(priorSnapshot, passphrase)
+      priorKey = prior.key
+    }
+    const rewrites = await prepareQueueMigration(payload.event_id, key, priorKey)
+    await commitSnapshotWithQueue(record, rewrites)
+    unlocked.set(payload.event_id, payload)
+    sessionKeys.set(payload.event_id, key)
+    return payload
+  },
+
+  async hasPreparedSnapshot(eventId) {
+    if (!eventId) return false
+    const row = await get(STORE_SNAPSHOTS, eventId)
+    return row?.format === 3 && Date.parse(row.expires_at || '') > Date.now()
+  },
+
+  async unlockSnapshot(eventId, passphrase) {
+    const row = await get(STORE_SNAPSHOTS, eventId)
+    if (!row) throw new Error('No offline snapshot is prepared on this device.')
+    const { payload, key } = await decryptSnapshot(row, passphrase)
+    unlocked.set(eventId, payload)
+    sessionKeys.set(eventId, key)
+    await migrateQueue(eventId, key)
+    return payload
+  },
+
+  async snapshot(eventId) {
+    const payload = unlocked.get(eventId) || null
+    if (!isActive(payload)) {
+      unlocked.delete(eventId)
+      sessionKeys.delete(eventId)
+      return null
+    }
+    return payload
+  },
+
+  isUnlocked(eventId) {
+    return !!unlocked.get(eventId) && isActive(unlocked.get(eventId))
+  },
+
+  async queued() {
+    const records = await all(STORE_QUEUE)
+    const results = []
+    for (const row of records) {
+      const key = sessionKeys.get(row.event_id)
+      if (!key || !isActive(unlocked.get(row.event_id))) continue
+      if (row.format !== 3) {
+        // Only legacy rows with the required fields can be recovered.
+        if (typeof row.payload === 'string' && typeof row.attendee_id === 'string') results.push(row)
+        continue
+      }
+      results.push(await decryptQueueItem(row, key))
+    }
+    return results
+  },
+
+  async queueCheckin(item) {
+    if (!this.isUnlocked(item.event_id)) throw new Error('Unlock your offline snapshot first.')
+    const key = sessionKeys.get(item.event_id)
+    return put(STORE_QUEUE, await encryptQueueItem(item, key))
+  },
+
+  removeQueued: id => remove(STORE_QUEUE, id),
+
+  async findCredential(eventId, payload) {
+    const snapshot = await this.snapshot(eventId)
+    if (!snapshot) return null
+    return snapshot.credentials.find(x => x.payload === payload) || null
+  },
+
+  async clearAll() {
+    unlocked.clear()
+    sessionKeys.clear()
+    await clear(STORE_SNAPSHOTS)
+    await clear(STORE_QUEUE)
   },
 }

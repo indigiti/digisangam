@@ -17,7 +17,23 @@ jobs:
         with:
           node-version: 22
       - run: npm install
+      - run: npm run test:security
       - run: npm run build
+      - run: npm run test:offline-build
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+      - name: Browser P0 regression checks
+        run: npm run test:e2e
+      - name: Upload failed browser traces
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: digisangam-browser-debug
+          path: |
+            frontend/test-results/
+            frontend/playwright-report/
+          if-no-files-found: ignore
+          retention-days: 7
 
   php:
     runs-on: ubuntu-latest
@@ -30,6 +46,8 @@ jobs:
         run: find app public scripts tests -name '*.php' -print0 | xargs -0 -n1 php -l
       - name: PHP smoke tests
         run: php tests/smoke.php
+      - name: Authentication regression tests
+        run: php tests/auth_security.php
       - name: HTTP API E2E
         run: |
           export DIGISANGAM_STORAGE_ROOT="$RUNNER_TEMP/digisangam-e2e-storage"
@@ -71,6 +89,9 @@ jobs:
         run: |
           npm install
           npm run build
+      - name: Verify offline precache in release build
+        working-directory: frontend
+        run: npm run test:offline-build
       - name: Build DigiOps release payload
         run: php tools/package-release.php
       - name: Verify DigiOps release payload

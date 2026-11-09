@@ -7,10 +7,21 @@ import LineSpark from '../components/LineSpark.vue'
 
 const events=useEventStore(),data=ref(null),error=ref('')
 const metrics=computed(()=>data.value?.metrics||{})
+let requestGeneration=0
 async function load(){
-  if(!events.loaded) await events.load()
-  if(!events.currentId){data.value=null;return}
-  try{data.value=await api.dashboard(events.currentId)}catch(e){error.value=e.message}
+  const generation=++requestGeneration
+  error.value=''
+  data.value=null
+  try {
+    if(!events.loaded) await events.load()
+    if(generation!==requestGeneration) return
+    const eventId=events.currentId
+    if(!eventId) return
+    const response=await api.dashboard(eventId)
+    if(generation===requestGeneration && eventId===events.currentId) data.value=response
+  }catch(e){
+    if(generation===requestGeneration) error.value=e.message
+  }
 }
 onMounted(load);watch(()=>events.currentId,load)
 </script>

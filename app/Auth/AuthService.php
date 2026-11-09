@@ -43,7 +43,10 @@ final class AuthService
             'workspace_id' => 'ws_default',
             'created_at' => date(DATE_ATOM),
         ];
-        $this->store->write('auth/users.json', [$user]);
+        $this->store->transaction('auth/users.json',static function(array $users) use ($user): array {
+            if($users!==[]) throw new \RuntimeException('Setup is already complete.');
+            return ['data'=>[$user],'result'=>true];
+        },[]);
         $this->authenticateSession($user);
         return $this->publicUser($user);
     }
@@ -76,7 +79,9 @@ final class AuthService
         $id = $_SESSION['user_id'] ?? null;
         if (!$id) return null;
         foreach ($this->users() as $user) {
-            if (($user['id'] ?? null) === $id) return $this->publicUser($user);
+            if (($user['id'] ?? null) !== $id) continue;
+            if (($user['active']??true)!==true) return null;
+            return $this->publicUser($user);
         }
         return null;
     }
@@ -126,8 +131,6 @@ final class AuthService
         if(!filter_var($email,FILTER_VALIDATE_EMAIL)) throw new \InvalidArgumentException('A valid email is required.');
         if(strlen($password)<10) throw new \InvalidArgumentException('Password must be at least 10 characters.');
         if(!in_array($role,Authorization::roles(),true)) throw new \InvalidArgumentException('Invalid role.');
-        $users=$this->users();
-        foreach($users as $user) if(strtolower((string)($user['email']??''))===$email) throw new \InvalidArgumentException('A user with this email already exists.');
         $record=[
             'id'=>'usr_'.bin2hex(random_bytes(6)),
             'name'=>$name,
@@ -138,14 +141,21 @@ final class AuthService
             'workspace_id'=>'ws_default',
             'created_at'=>date(DATE_ATOM),
         ];
-        $users[]=$record;
-        $this->store->write('auth/users.json',$users);
-        return $this->publicUser($record);
+        return $this->store->transaction('auth/users.json',function(array $users) use ($record,$email): array {
+            foreach($users as $user) {
+                if(strtolower((string)($user['email']??''))===$email) {
+                    throw new \InvalidArgumentException('A user with this email already exists.');
+                }
+            }
+            $users[]=$record;
+            return ['data'=>$users,'result'=>$this->publicUser($record)];
+        },[]);
     }
 
     public function updateUser(string $id,array $input): ?array
     {
-        $users=$this->users();$updated=null;
+        return $this->store->transaction('auth/users.json',function(array $users) use ($id,$input): array {
+            $updated=null;
         foreach($users as &$user){
             if(($user['id']??'')!==$id) continue;
             $nextRole=array_key_exists('role',$input)?trim((string)$input['role']):(string)($user['role']??'viewer');
@@ -174,8 +184,8 @@ final class AuthService
             break;
         }
         unset($user);
-        if($updated!==null) $this->store->write('auth/users.json',$users);
-        return $updated;
+            return ['data'=>$users,'result'=>$updated];
+        },[]);
     }
 
     private function users(): array

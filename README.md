@@ -111,11 +111,15 @@ Published/live events are available at:
 
 Before venue connectivity becomes unreliable:
 
-1. Sign in on the OnGround device.
-2. Open **OnGround**.
-3. Choose **Sync event data** while online.
-4. Confirm the snapshot shows as ready and cached attendee count is non-zero.
-5. Offline scans are stored locally and can be reconciled with **Sync check-ins** after connectivity returns.
+1. Sign in on the OnGround device and select the correct event.
+2. Open **OnGround** while connected; enter an offline passphrase with **at least 10 characters**.
+3. Choose **Prepare / Re-sync**. This verifies a 48-hour, Ed25519-signed snapshot and encrypts its contents before writing them to IndexedDB.
+4. Confirm the snapshot shows as **Ready** with the expected attendee count. The event passphrase is not stored or recoverable.
+5. If the connection fails or the device reloads offline, open **OnGround** and **unlock the saved snapshot** using the passphrase. Only this constrained device workflow is available without a live login session.
+6. Offline check-ins are encrypted locally and are only provisional until the server revalidates them. Reconnect and sync the queued check-ins.
+7. **Do not clear browser data, reset the passphrase, or replace a prepared snapshot with unsynced entries.** Existing v2 snapshots must be prepared again online for the v3 trust model.
+
+See [P0 pre-redesign audit](docs/P0-PRE-REDESIGN-AUDIT.md) for the release requirements and migration caveats.
 
 ## Current status
 
