@@ -3,6 +3,7 @@ import { computed, onUnmounted, reactive, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { api } from '../services/api'
 import PublicRegistrationField from '../components/PublicRegistrationField.vue'
+import {getTicketDesign} from '../services/ticketDesigns'
 import { setPageSeo, resetPageSeo, canonicalPublicPath } from '../services/seo'
 
 const route=useRoute(),router=useRouter()
@@ -15,6 +16,7 @@ const fields=computed(()=>data.value?.registration?.fields||[])
 const startingPrice=computed(()=>{const prices=(data.value?.tickets||[]).map(t=>Number(t.price||0));return prices.length?Math.min(...prices):null})
 const ticketRemaining=ticket=>Math.max(0,Number(ticket?.quantity||0)-Number(ticket?.sold||0)-Number(ticket?.reserved||0))
 const validAccent=value=>/^#[0-9a-fA-F]{6}$/.test(String(value||''))?String(value):'#6154dc'
+const ticketDesign=computed(()=>getTicketDesign(data.value?.event?.ticket_design))
 const accent=computed(()=>validAccent(data.value?.event?.branding?.primary_color))
 const accentContrast=computed(()=>{
   const hex=accent.value.slice(1)
@@ -170,7 +172,7 @@ async function submit(){
 }
 </script>
 <template>
-<main class="public-event min-h-screen bg-[#f7f8fc] text-[#20283b]" :style="{'--event-accent':accent,'--event-accent-contrast':accentContrast}">
+<main class="public-event min-h-screen bg-[#f7f8fc] text-[#20283b]" :class="'public-event--'+ticketDesign.id" :style="{'--event-accent':accent,'--event-accent-contrast':accentContrast,'--ticket-hero':ticketDesign.hero}">
   <div v-if="previewMode" class="sticky top-0 z-[70] flex items-center justify-between gap-3 bg-amber-400 px-4 py-2 text-[12px] font-bold text-amber-950"><span>Admin preview · registration is disabled.</span><RouterLink :to="'/events/'+route.params.id" class="rounded bg-amber-950 px-3 py-1 text-white">Back to event</RouterLink></div>
 
   <header class="sticky top-0 z-50 bg-white shadow-[0_1px_0_rgba(0,0,0,.07)]">
@@ -185,7 +187,7 @@ async function submit(){
   <div v-else-if="error&&!data" class="grid min-h-[70vh] place-items-center p-6"><div class="max-w-md text-center"><div class="mx-auto grid h-14 w-14 place-items-center rounded-2xl bg-rose-50 font-black text-rose-600">!</div><h1 class="mt-4 text-2xl font-black">Registration unavailable</h1><p class="mt-2 text-sm text-slate-500">{{error}}</p><RouterLink to="/discover" class="mt-5 inline-flex rounded-lg event-primary px-5 py-2.5 text-sm font-bold text-white">Explore events</RouterLink></div></div>
 
   <template v-else-if="data">
-    <section class="relative overflow-hidden bg-[#171c3a] text-white">
+    <section class="public-event-hero relative overflow-hidden bg-[#171c3a] text-white">
       <img v-if="data.event.branding?.cover_url" :src="data.event.branding.cover_url" alt="" class="absolute inset-0 h-full w-full object-cover opacity-[.16] blur-xl"/>
       <div class="absolute inset-0 bg-gradient-to-r from-[#151a32] via-[#171d3b]/95 to-[#1b2248]/80"></div>
 
@@ -199,7 +201,7 @@ async function submit(){
 
         <div class="min-w-0 py-2">
           <div class="flex flex-wrap gap-2"><span class="rounded-full bg-white/10 px-3 py-1 text-[10px] font-bold">{{data.event.type}}</span><span class="rounded-full bg-white/10 px-3 py-1 text-[10px] font-bold">{{data.event.category}}</span><span v-if="data.event.status==='Live'" class="rounded-full event-primary px-3 py-1 text-[10px] font-black">LIVE</span></div>
-          <h1 class="mt-4 text-[33px] font-extrabold leading-[1.08] tracking-[-.045em] sm:text-[46px]">{{data.event.public_page?.headline||data.event.name}}</h1>
+          <h1 class="public-event-heading mt-4 text-[33px] font-extrabold leading-[1.08] tracking-[-.045em] sm:text-[46px]">{{data.event.public_page?.headline||data.event.name}}</h1>
           <p class="mt-4 max-w-2xl text-[13px] leading-6 text-slate-300">{{data.event.description||'Discover this event and register securely with DigiSangam.'}}</p>
 
           <div class="mt-6 space-y-3 text-[12px] font-semibold text-slate-200">
@@ -257,7 +259,7 @@ async function submit(){
       </div>
     </section>
 
-    <section id="registration-flow" class="bg-white py-12 pb-28 lg:pb-16">
+    <section id="registration-flow" class="public-event-checkout bg-white py-12 pb-28 lg:pb-16">
       <div class="mx-auto max-w-[1240px] px-4 sm:px-6">
         <div class="mb-6"><p class="text-[10px] font-black uppercase tracking-[.16em] event-text">Registration</p><h2 class="mt-1 text-[24px] font-black tracking-[-.025em]">Book your place</h2></div>
 
@@ -266,11 +268,11 @@ async function submit(){
         </div>
 
         <div class="grid gap-6 lg:grid-cols-[minmax(0,1fr)_320px]">
-          <section class="rounded-[20px] border border-slate-200 bg-white p-5 shadow-[0_10px_35px_rgba(20,28,60,.035)] sm:p-7">
+          <section class="public-checkout-panel rounded-[20px] border border-slate-200 bg-white p-5 shadow-[0_10px_35px_rgba(20,28,60,.035)] sm:p-7">
             <div v-if="step===1">
               <h3 class="text-[19px] font-black">Select a ticket</h3><p class="mt-1 text-[12px] text-slate-500">Choose one available ticket type.</p>
               <div class="mt-5 grid gap-3">
-                <button v-for="ticket in data.tickets" :key="ticket.id" type="button" :disabled="ticketRemaining(ticket)<=0" :aria-pressed="selectedTicket===ticket.id" @click="selectedTicket=ticket.id" class="grid gap-3 rounded-[15px] border p-4 text-left transition disabled:cursor-not-allowed disabled:opacity-50 sm:grid-cols-[1fr_auto] sm:items-center" :class="selectedTicket===ticket.id?'event-border bg-indigo-50':'border-slate-200 hover:border-indigo-200'">
+                <button v-for="ticket in data.tickets" :key="ticket.id" type="button" :disabled="ticketRemaining(ticket)<=0" :aria-pressed="selectedTicket===ticket.id" @click="selectedTicket=ticket.id" class="public-ticket-option grid gap-3 rounded-[15px] border p-4 text-left transition disabled:cursor-not-allowed disabled:opacity-50 sm:grid-cols-[1fr_auto] sm:items-center" :class="selectedTicket===ticket.id?'event-border bg-indigo-50':'border-slate-200 hover:border-indigo-200'">
                   <div><div class="flex items-center gap-2"><h4 class="text-[14px] font-black">{{ticket.name}}</h4><span v-if="ticketRemaining(ticket)<25" class="rounded-full bg-amber-50 px-2 py-1 text-[9px] font-bold text-amber-700">{{ticket.quantity-ticket.sold-(ticket.reserved||0)}} left</span></div><p class="mt-1 text-[11px] text-slate-500">{{ticket.quantity-ticket.sold-(ticket.reserved||0)}} available · {{ticket.status}}</p></div><strong class="text-[18px]">{{money(ticket.price)}}</strong>
                 </button>
                 <div v-if="!data.tickets.length" class="rounded-[12px] bg-amber-50 p-5 text-[12px] text-amber-800">No tickets are currently available.</div>

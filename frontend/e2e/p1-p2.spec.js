@@ -22,26 +22,26 @@ const form={
   ],
 }
 
-async function mockBackend(page, onRegistration = () => {}) {
+async function mockBackend(page, onRegistration = () => {}, eventFixture = event) {
   await page.route('**/api/v1/**',route=>{
     const url=new URL(route.request().url())
     const path=url.pathname.split('/api/v1/')[1]||''
     const json=(body,status=200)=>route.fulfill({status,contentType:'application/json',body:JSON.stringify(body)})
     if(path==='auth/status')return json({setup_required:false,csrf_token:'csrf_fixture',user:{id:'usr',name:'QA Organizer',role:'super_admin'}})
-    if(path==='events')return json([event,{...event,id:'evt_two',name:'Second Summit',status:'Draft',location:'Mumbai'}])
-    if(path==='public/events')return json({events:[event],categories:['Technology'],locations:['Pune']})
-    if(path==='public/events/evt_public')return json({event,tickets,registration:form})
+    if(path==='events')return json([eventFixture,{...eventFixture,id:'evt_two',name:'Second Summit',status:'Draft',location:'Mumbai'}])
+    if(path==='public/events')return json({events:[eventFixture],categories:['Technology'],locations:['Pune']})
+    if(path==='public/events/evt_public')return json({event:eventFixture,tickets,registration:form})
     if(path==='public/events/evt_public/register'&&route.request().method()==='POST'){
       onRegistration(route.request().postDataJSON())
       return json({confirmation_token:'demo-token'})
     }
     if(path==='public/confirmations/demo-token')return json({
       attendee:{id:'att_1',name:'QA Attendee',email:'qa@example.test',category:'General',status:'Confirmed'},
-      event,order:{status:'paid',amount:0},ticket:tickets[1],
+      event:eventFixture,order:{status:'paid',amount:0},ticket:tickets[1],
       credential:{payload:'digisangam://credential/example'},
     })
     if(path.startsWith('dashboard'))return json({
-      event,stats:[{label:'Registrations',value:'24',delta:'',tone:'blue'}],
+      event:eventFixture,stats:[{label:'Registrations',value:'24',delta:'',tone:'blue'}],
       trend:[2,4,3,7,11,12],categories:[],metrics:{},
     })
     return json([])
@@ -102,3 +102,23 @@ test('P2 valid free ticket completes server registration and shows verified stat
   expect(registered?.ticket_id).toBe('tk_free')
   expect(registered?.answers?.fld_name).toBe('QA Attendee')
 })
+
+const ticketDesignIds=['editorial-mono','grand-theatre-dark','neon-festival','commerce-blue','soft-luxe-wellness']
+for (const designId of ticketDesignIds) {
+  test('P2 '+designId+' preserves organizer branding and renders signed ticket',async({page})=>{
+    const customEvent={...event,ticket_design:designId}
+    await mockBackend(page,()=>{},customEvent)
+    await page.goto(base+'e/evt_public')
+    const shell=page.locator('main.public-event')
+    await expect(shell).toHaveClass(new RegExp('public-event--'+designId))
+    const color=await shell.evaluate(node=>getComputedStyle(node).getPropertyValue('--event-accent').trim())
+    expect(color).toBe('#f4dc3b')
+    const contrast=await shell.evaluate(node=>getComputedStyle(node).getPropertyValue('--event-accent-contrast').trim())
+    expect(contrast).toBe('#142039')
+    await page.goto(base+'e/evt_public/confirmation/demo-token')
+    const ticket=page.locator('article.ds-ticket')
+    await expect(ticket).toHaveClass(new RegExp('ds-ticket--'+designId))
+    await expect(ticket.getByText('QA Attendee')).toBeVisible()
+    await expect(ticket.locator('img[alt="DigiSangam signed attendee QR credential"]')).toBeVisible()
+  })
+}

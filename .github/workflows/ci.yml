@@ -18,6 +18,8 @@ jobs:
           node-version: 22
       - run: npm install
       - run: npm run test:security
+      - name: Verify ticket design registry
+        run: node --test tests/ticket-designs.test.mjs
       - run: npm run build
       - run: npm run test:offline-build
       - name: Verify initial-load performance budgets
@@ -48,6 +50,8 @@ jobs:
         run: find app public scripts tests -name '*.php' -print0 | xargs -0 -n1 php -l
       - name: PHP smoke tests
         run: php tests/smoke.php
+      - name: Ticket design persistence regression
+        run: php tests/ticket_designs.php
       - name: Authentication regression tests
         run: php tests/auth_security.php
       - name: Public event HTML metadata and privacy tests

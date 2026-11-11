@@ -11,6 +11,7 @@ final class EventRepository
     private const FORMATS=['in_person','hybrid','virtual'];
     private const PRIVACY=['public','private','invite_only'];
     private const STATUSES=['Draft','Published','Live','Completed','Archived'];
+    private const TICKET_DESIGNS=['editorial-mono','grand-theatre-dark','neon-festival','commerce-blue','soft-luxe-wellness'];
 
     public function __construct(private readonly JsonFileStore $store) {}
 
@@ -67,6 +68,7 @@ final class EventRepository
                 'currency'=>$currency,
                 'privacy'=>$privacy,
                 'status'=>'Draft',
+                'ticket_design'=>'editorial-mono',
                 'branding'=>[
                     'brand_name'=>trim((string)($input['branding']['brand_name']??$name)),
                     'logo_url'=>trim((string)($input['branding']['logo_url']??'')),
@@ -115,6 +117,12 @@ final class EventRepository
                 if(!preg_match('/^[A-Z]{3}$/',(string)$event['currency'])) throw new \InvalidArgumentException('Event currency must use a three-letter code.');
                 $event['timezone']=trim((string)($event['timezone']??'Asia/Kolkata'))?:'Asia/Kolkata';
                 try{new \DateTimeZone((string)$event['timezone']);}catch(\Throwable){throw new \InvalidArgumentException('Invalid event timezone.');}
+
+                if(array_key_exists('ticket_design',$input)){
+                    $design=trim((string)$input['ticket_design']);
+                    if(!in_array($design,self::TICKET_DESIGNS,true)) throw new \InvalidArgumentException('Unknown ticket design.');
+                    $event['ticket_design']=$design;
+                }
 
                 if(isset($input['branding'])&&is_array($input['branding'])){
                     $event['branding']=array_merge((array)($event['branding']??[]),$input['branding']);
