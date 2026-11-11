@@ -19,7 +19,7 @@ const validAccent=value=>/^#[0-9a-fA-F]{6}$/.test(String(value||''))?String(valu
 const ticketDesign=computed(()=>getTicketDesign(data.value?.event?.ticket_design))
 const accent=computed(()=>validAccent(data.value?.event?.branding?.primary_color))
 const accentContrast=computed(()=>{
-  const hex=accent.value.slice(1)
+  const hex=ticketDesign.value.accent.slice(1)
   const channels=[0,2,4].map(i=>parseInt(hex.slice(i,i+2),16)/255)
   const luminance=channels.map(c=>c<=.04045?c/12.92:Math.pow((c+.055)/1.055,2.4))
   const l=.2126*luminance[0]+.7152*luminance[1]+.0722*luminance[2]
@@ -172,7 +172,7 @@ async function submit(){
 }
 </script>
 <template>
-<main class="public-event min-h-screen bg-[#f7f8fc] text-[#20283b]" :class="'public-event--'+ticketDesign.id" :style="{'--event-accent':ticketDesign.accent,'--event-accent-contrast':ticketDesign.dark?'#ffffff':accentContrast,'--ticket-hero':ticketDesign.hero}">
+<main class="public-event min-h-screen bg-[#f7f8fc] text-[#20283b]" :class="'public-event--'+ticketDesign.id" :style="{'--event-accent':ticketDesign.accent,'--event-accent-contrast':accentContrast,'--ticket-hero':ticketDesign.hero}">
   <div v-if="previewMode" class="sticky top-0 z-[70] flex items-center justify-between gap-3 bg-amber-400 px-4 py-2 text-[12px] font-bold text-amber-950"><span>Admin preview · registration is disabled.</span><RouterLink :to="'/events/'+route.params.id" class="rounded bg-amber-950 px-3 py-1 text-white">Back to event</RouterLink></div>
 
   <header class="sticky top-0 z-50 bg-white shadow-[0_1px_0_rgba(0,0,0,.07)]">
