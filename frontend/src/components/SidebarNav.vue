@@ -15,6 +15,7 @@ const groups = [
   { label: 'WORKSPACE', items: [
     ['/', 'Overview', 'dashboard'], ['/events', 'Events', 'calendar'],
     ['/registrations', 'Registrations', 'form'], ['/tickets', 'Tickets', 'ticket'],
+    ['/ticket-designs', 'Ticket Design Studio', 'ticket'],
     ['/attendees', 'Attendees', 'users'],
   ] },
   { label: 'EVENT OPERATIONS', items: [

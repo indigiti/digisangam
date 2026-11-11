@@ -153,3 +153,25 @@ html[data-theme="dark"] .app-bg .icon-btn:hover { background:#283650;border-colo
 .ds-loader { width:15px;height:15px;border:2px solid currentColor;border-bottom-color:transparent;border-radius:50%;animation:ds-spin .7s linear infinite; }
 @keyframes ds-spin { to { transform:rotate(360deg); } }
 @media (prefers-reduced-motion:reduce) { .ds-loader { animation:none; } }
+
+/* Five event ticket design systems share the same secure registration logic. */
+.public-event .public-event-hero{background:var(--ticket-hero,#171c3a)}
+.public-event .public-event-heading{max-width:740px}
+.public-event--editorial-mono .public-event-heading,.public-event--grand-theatre-dark .public-event-heading,.public-event--soft-luxe-wellness .public-event-heading{font-family:Georgia,'Times New Roman',serif;font-weight:600;letter-spacing:-.04em}
+.public-event--grand-theatre-dark .public-event-hero{background:#10141d}
+.public-event--grand-theatre-dark .public-event-hero h1{color:#ffe7b1}
+.public-event--grand-theatre-dark .public-event-checkout{background:#f8f5ef}
+.public-event--grand-theatre-dark .public-checkout-panel{border-color:#d8c9ad}
+.public-event--neon-festival .public-event-hero{background:linear-gradient(120deg,#160a38,#77148f 55%,#101c65)}
+.public-event--neon-festival .public-event-heading{font-weight:900}
+.public-event--neon-festival .public-event-checkout{background:#f8f4ff}
+.public-event--neon-festival .public-ticket-option[aria-pressed="true"]{background:#fce9f7}
+.public-event--commerce-blue .public-event-hero{background:linear-gradient(110deg,#0a1a3b,#165cc3)}
+.public-event--commerce-blue .public-event-checkout{background:#f3f7ff}
+.public-event--commerce-blue .public-checkout-panel{box-shadow:0 12px 34px rgba(16,93,232,.06)}
+.public-event--soft-luxe-wellness .public-event-hero{background:linear-gradient(115deg,#57416f,#a179b7 75%)}
+.public-event--soft-luxe-wellness .public-event-checkout{background:#fff8ff}
+.public-event--soft-luxe-wellness .public-checkout-panel{border-radius:26px;border-color:#ebdcf0}
+.public-event--editorial-mono .public-event-checkout{background:#fffbf7}
+.public-event--editorial-mono .public-checkout-panel{border-color:#ede4e4}
+.public-event .public-ticket-option:focus-visible{outline:3px solid var(--event-accent);outline-offset:3px}

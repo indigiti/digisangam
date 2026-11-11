@@ -11,6 +11,7 @@ const EventDetailPage = () => import('../pages/EventDetailPage.vue')
 const RegistrationBuilderPage = () => import('../pages/RegistrationBuilderPage.vue')
 const AttendeesPage = () => import('../pages/AttendeesPage.vue')
 const TicketsPage = () => import('../pages/TicketsPage.vue')
+const TicketDesignPage = () => import('../pages/TicketDesignPage.vue')
 const CommercePage = () => import('../pages/CommercePage.vue')
 const AnalyticsPage = () => import('../pages/AnalyticsPage.vue')
 const IntelligencePage = () => import('../pages/IntelligencePage.vue')
@@ -44,6 +45,7 @@ export default createRouter({
       {path:'registrations',name:'registrations',component:RegistrationBuilderPage},
       {path:'attendees',name:'attendees',component:AttendeesPage},
       {path:'tickets',name:'tickets',component:TicketsPage},
+      {path:'ticket-designs',name:'ticket-designs',component:TicketDesignPage},
       {path:'communication',name:'communication',component:CommunicationPage},
       {path:'automation',name:'automation',component:AutomationPage},
       {path:'badges',name:'badges',component:BadgesPage},
