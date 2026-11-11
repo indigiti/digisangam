@@ -34,12 +34,13 @@ watch(()=>events.currentId,load)
   <div class="space-y-7">
     <section class="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
       <div>
-        <p class="eyebrow">Command Center / Overview</p>
+        <p class="eyebrow">DIGISANGAM / ORGANIZER STUDIO</p>
         <h1 class="page-title">Good to see you, {{auth.user?.name?.split(' ')[0]||'Organizer'}}.</h1>
-        <p class="page-subtitle">One place to plan, monitor and operate your events.</p>
+        <p class="page-subtitle">Your command center for ticketing, audience growth and unforgettable experiences.</p>
       </div>
       <div class="flex flex-wrap gap-2">
         <RouterLink to="/events" class="btn-secondary">All events</RouterLink>
+        <RouterLink to="/discover" class="btn-secondary">Explore public site ↗</RouterLink>
         <DsButton to="/events/create"><span aria-hidden="true">＋</span> Create event</DsButton>
       </div>
     </section>

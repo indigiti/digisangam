@@ -46,7 +46,7 @@ onBeforeUnmount(()=>window.removeEventListener('keydown',onEscape))
       <form role="search" @submit.prevent="emit('search')">
         <label for="market-mobile-search" class="sr-only">Search experiences</label>
         <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m16 16 4.5 4.5"/></svg>
-        <input id="market-mobile-search" :value="query" type="search" placeholder="Search for events, conferences, workshops and more" @input="emit('update:query',$event.target.value)"/>
+        <input id="market-mobile-search" :value="query" type="search" placeholder="Search events and experiences" @input="emit('update:query',$event.target.value)"/>
         <button type="submit" aria-label="Search">Go</button>
       </form>
     </div>
