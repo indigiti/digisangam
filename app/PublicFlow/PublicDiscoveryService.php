@@ -136,7 +136,7 @@ final class PublicDiscoveryService
         $total=count($rows);
 
         $page=max(1,min(100000,(int)($filters['page']??1)));
-        $perPage=isset($filters['per_page'])?max(1,min(48,(int)$filters['per_page'])):null;
+        $perPage=isset($filters['per_page']) && $filters['per_page']!=='' ? max(1,min(48,(int)$filters['per_page'])) : null;
         if($perPage!==null) $rows=array_slice($rows,($page-1)*$perPage,$perPage);
 
         return [
