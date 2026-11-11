@@ -45,7 +45,7 @@ const filtered=computed(()=>{
     if(!dateMatches(e.start_date,e.end_date,dateFilter.value))return false
     if(availableOnly.value&&Number(e.available||0)<=0)return false
     if(priceFilter.value!=='All'){
-      if(!Number(e.ticket_count||0))return false
+      if(!Number(e.ticket_count||0)||String(e.currency||'INR')!=='INR')return false
       const p=Number(e.min_price||0)
       if(priceFilter.value==='Free'&&p!==0)return false
       if(priceFilter.value==='Under ₹500'&&p>=500)return false
@@ -85,7 +85,7 @@ async function load(append=false){
       q:query.value.trim(),category:category.value==='All'?'':category.value,
       city:city.value==='All'?'':city.value,
       date:{Today:'today',Tomorrow:'tomorrow','This weekend':'weekend'}[dateFilter.value]||'',
-      max_price:priceArg(),available_only:availableOnly.value?1:'',
+      max_price:priceArg(),currency:priceFilter.value==='All'?'':'INR',available_only:availableOnly.value?1:'',
       sort:sort.value,per_page:limit,page:page.value
     })
     if(current!==requestVersion)return

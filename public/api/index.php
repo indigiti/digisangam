@@ -269,17 +269,19 @@ try {
         }
 
         if ($method === 'GET' && $path === '/public/events') {
+            $publicParam=static fn(string $key,string $fallback=''): string => isset($_GET[$key]) && is_scalar($_GET[$key]) ? (string)$_GET[$key] : $fallback;
             JsonResponse::send((new PublicDiscoveryService(new EventRepository($store),new TicketRepository($store)))->browse([
-                'q'=>$_GET['q']??'',
-                'category'=>$_GET['category']??'',
-                'city'=>$_GET['city']??'',
-                'date'=>$_GET['date']??'',
-                'sort'=>$_GET['sort']??'date',
-                'min_price'=>$_GET['min_price']??'',
-                'max_price'=>$_GET['max_price']??'',
-                'available_only'=>$_GET['available_only']??false,
-                'page'=>$_GET['page']??1,
-                'per_page'=>$_GET['per_page']??null,
+                'q'=>$publicParam('q',''),
+                'category'=>$publicParam('category',''),
+                'currency'=>$publicParam('currency',''),
+                'city'=>$publicParam('city',''),
+                'date'=>$publicParam('date',''),
+                'sort'=>$publicParam('sort','date'),
+                'min_price'=>$publicParam('min_price',''),
+                'max_price'=>$publicParam('max_price',''),
+                'available_only'=>$publicParam('available_only',''),
+                'page'=>$publicParam('page','1'),
+                'per_page'=>$publicParam('per_page',''),
             ]));
         }
 

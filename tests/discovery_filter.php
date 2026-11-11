@@ -65,6 +65,13 @@ try{
     discoveryAssert($soldResult['events'][0]['available']===0,'Sold-out inventory must show zero availability.');
     discoveryAssert($service->browse(['q'=>'Sold Out Jazz','available_only'=>true])['total']===0,'Available-only query leaked a sold-out event.');
 
+    $dollarEvent=$events->create(['name'=>'International Meetup','category'=>'Workshops','currency'=>'USD',
+        'start_date'=>$year.'-08-10','location'=>'Mumbai, India','privacy'=>'public']);
+    $events->update($dollarEvent['id'],['status'=>'Published']);
+    $tickets->create(['event_id'=>$dollarEvent['id'],'name'=>'Standard','price'=>300,'quantity'=>3]);
+    $rupeeOnly=$service->browse(['max_price'=>500,'currency'=>'INR']);
+    discoveryAssert($rupeeOnly['total']===2,'INR price filters must exclude other currencies.');
+    discoveryAssert($service->browse(['currency'=>'USD'])['total']===1,'Currency-specific filtering failed.');
     echo "Public discovery filtering, privacy, facets and pagination passed.\n";
 }finally{
     $it=new RecursiveIteratorIterator(new RecursiveDirectoryIterator($root,FilesystemIterator::SKIP_DOTS),RecursiveIteratorIterator::CHILD_FIRST);

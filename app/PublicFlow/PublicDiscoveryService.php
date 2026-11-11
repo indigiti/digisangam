@@ -82,13 +82,14 @@ final class PublicDiscoveryService
 
         $q=strtolower(trim(substr((string)($filters['q']??''),0,120)));
         $category=strtolower(trim(substr((string)($filters['category']??''),0,80)));
+        $currency=strtoupper(trim(substr((string)($filters['currency']??''),0,3)));
         $city=strtolower(trim(substr((string)($filters['city']??''),0,100)));
         $date=strtolower(trim((string)($filters['date']??'')));
         $minPrice=isset($filters['min_price']) && $filters['min_price']!=='' && is_numeric($filters['min_price'])?max(0,(float)$filters['min_price']):null;
         $maxPrice=isset($filters['max_price']) && $filters['max_price']!=='' && is_numeric($filters['max_price'])?max(0,(float)$filters['max_price']):null;
         $availableOnly=filter_var($filters['available_only']??false,FILTER_VALIDATE_BOOLEAN);
 
-        $rows=array_values(array_filter($all,static function(array $event) use ($q,$category,$city,$date,$minPrice,$maxPrice,$availableOnly): bool {
+        $rows=array_values(array_filter($all,static function(array $event) use ($q,$category,$city,$date,$minPrice,$maxPrice,$availableOnly,$currency): bool {
             if($q!==''){
                 $hay=strtolower(implode(' ',[
                     $event['name'],$event['headline'],$event['description'],$event['type'],
@@ -97,6 +98,7 @@ final class PublicDiscoveryService
                 if(!str_contains($hay,$q)) return false;
             }
             if($category!=='' && $category!=='all' && strtolower($event['category'])!==$category) return false;
+            if($currency!=='' && strtoupper($event['currency'])!==$currency) return false;
             if($city!=='' && $city!=='all' && strtolower($event['city'])!==$city) return false;
             if($availableOnly && $event['available']<=0) return false;
             if($minPrice!==null && ($event['ticket_count']===0 || $event['min_price']<$minPrice)) return false;
