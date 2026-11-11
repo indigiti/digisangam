@@ -269,7 +269,18 @@ try {
         }
 
         if ($method === 'GET' && $path === '/public/events') {
-            JsonResponse::send((new PublicDiscoveryService(new EventRepository($store),new TicketRepository($store)))->browse());
+            JsonResponse::send((new PublicDiscoveryService(new EventRepository($store),new TicketRepository($store)))->browse([
+                'q'=>$_GET['q']??'',
+                'category'=>$_GET['category']??'',
+                'city'=>$_GET['city']??'',
+                'date'=>$_GET['date']??'',
+                'sort'=>$_GET['sort']??'date',
+                'min_price'=>$_GET['min_price']??'',
+                'max_price'=>$_GET['max_price']??'',
+                'available_only'=>$_GET['available_only']??false,
+                'page'=>$_GET['page']??1,
+                'per_page'=>$_GET['per_page']??null,
+            ]));
         }
 
         if ($method === 'GET' && preg_match('#^/public/events/([^/]+)$#',$path,$m)) {
