@@ -20,15 +20,31 @@ final class PublicDiscoveryService
 
     public function browse(array $filters=[]): array
     {
+        // Snapshot inventory once: avoid O(events × tickets) JSON reads on every browse.
+        // Count active sale-window tickets even when sold out so the UI can label them correctly.
+        $ticketSummary=[];
+        $today=date('Y-m-d');
+        foreach($this->tickets->all() as $ticket){
+            if(($ticket['status']??'')!=='Active')continue;
+            if(!empty($ticket['sale_start']) && $ticket['sale_start']>$today)continue;
+            if(!empty($ticket['sale_end']) && $ticket['sale_end']<$today)continue;
+            $id=(string)($ticket['event_id']??'');
+            if($id==='')continue;
+            if(!isset($ticketSummary[$id]))$ticketSummary[$id]=['prices'=>[],'count'=>0,'available'=>0];
+            $ticketSummary[$id]['count']++;
+            $ticketSummary[$id]['prices'][]=max(0,(int)($ticket['price']??0));
+            $ticketSummary[$id]['available']+=max(0,(int)($ticket['quantity']??0)-(int)($ticket['sold']??0)-(int)($ticket['reserved']??0));
+        }
+
         $all=[];
         foreach($this->events->all() as $event){
             if(!in_array((string)($event['status']??''),['Published','Live'],true)) continue;
             if(($event['privacy']??'public')!=='public') continue;
 
             $eventId=(string)($event['id']??'');
-            $tickets=$this->tickets->publicForEvent($eventId);
-            $prices=array_map(static fn(array $t): int => (int)($t['price']??0),$tickets);
-            $available=array_sum(array_map(static fn(array $t): int => max(0,(int)($t['quantity']??0)-(int)($t['sold']??0)-(int)($t['reserved']??0)),$tickets));
+            $summary=$ticketSummary[$eventId]??['prices'=>[],'count'=>0,'available'=>0];
+            $prices=$summary['prices'];
+            $available=$summary['available'];
             $location=trim((string)($event['location']??''));
             $city=trim((string)($event['city']??''));
             if($city==='') $city=trim(explode(',',$location,2)[0]);
@@ -52,7 +68,7 @@ final class PublicDiscoveryService
                 'status'=>(string)($event['status']??'Published'),
                 'branding'=>(array)($event['branding']??[]),
                 'min_price'=>$prices===[]?0:min($prices),
-                'ticket_count'=>count($tickets),
+                'ticket_count'=>$summary['count'],
                 'available'=>$available,
             ];
         }

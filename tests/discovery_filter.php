@@ -52,6 +52,19 @@ try{
     discoveryAssert($first['events'][0]['id']!==$second['events'][0]['id'],'Pagination returned duplicate event.');
     discoveryAssert(count($service->browse(['max_price'=>-100])['events'])===0,'Negative price input should safely clamp to zero.');
     discoveryAssert(count($service->browse(['city'=>'Unknown'])['events'])===0,'Unknown city must not match.');
+    // Sold-out ticket types remain identifiable in discovery but are never bookable.
+    $sold=$events->create(['name'=>'Sold Out Jazz','category'=>'Music',
+        'start_date'=>$year.'-06-12','location'=>'Pune, India','privacy'=>'public']);
+    $events->update($sold['id'],['status'=>'Published']);
+    $single=$tickets->create(['event_id'=>$sold['id'],'name'=>'Standard','price'=>450,'quantity'=>1]);
+    $tickets->reserveOne($single['id'],$sold['id']);
+    $tickets->commitReservation($single['id'],$sold['id']);
+    $soldResult=$service->browse(['q'=>'Sold Out Jazz']);
+    discoveryAssert($soldResult['total']===1,'Sold-out event should remain visible.');
+    discoveryAssert($soldResult['events'][0]['ticket_count']===1,'Sold-out inventory lost its published ticket type.');
+    discoveryAssert($soldResult['events'][0]['available']===0,'Sold-out inventory must show zero availability.');
+    discoveryAssert($service->browse(['q'=>'Sold Out Jazz','available_only'=>true])['total']===0,'Available-only query leaked a sold-out event.');
+
     echo "Public discovery filtering, privacy, facets and pagination passed.\n";
 }finally{
     $it=new RecursiveIteratorIterator(new RecursiveDirectoryIterator($root,FilesystemIterator::SKIP_DOTS),RecursiveIteratorIterator::CHILD_FIRST);
