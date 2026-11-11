@@ -3,12 +3,17 @@ import { computed, onUnmounted, reactive, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { api } from '../services/api'
 import PublicRegistrationField from '../components/PublicRegistrationField.vue'
+import MarketplaceHeader from '../components/MarketplaceHeader.vue'
 import {getTicketDesign} from '../services/ticketDesigns'
 import { setPageSeo, resetPageSeo, canonicalPublicPath } from '../services/seo'
 
 const route=useRoute(),router=useRouter()
 const loading=ref(true),busy=ref(false),error=ref(''),data=ref(null),step=ref(1),selectedTicket=ref(''),invitation=ref(null)
 const previewMode=computed(()=>route.name==='event-preview')
+const headerQuery=ref('')
+const headerCity=computed(()=>String(data.value?.event?.location||'').split(',')[0].trim()||'All')
+function marketplaceSearch(){router.push({path:'/discover',query:headerQuery.value.trim()?{q:headerQuery.value.trim()}: {}})}
+function marketplaceCity(city){router.push({path:'/discover',query:city!=='All'?{city}:{}})}
 const answers=reactive({}),honeypot=ref(''),uploadingField=ref('')
 const money=n=>Number(n||0)===0?'Free':new Intl.NumberFormat('en-IN',{style:'currency',currency:data.value?.event?.currency||'INR',maximumFractionDigits:0}).format(n)
 const selected=computed(()=>data.value?.tickets?.find(x=>x.id===selectedTicket.value)||null)
@@ -175,23 +180,17 @@ async function submit(){
 <main class="public-event min-h-screen bg-[#f7f8fc] text-[#20283b]" :class="'public-event--'+ticketDesign.id" :style="{'--event-accent':accent,'--event-accent-contrast':accentContrast,'--ticket-hero':ticketDesign.hero}">
   <div v-if="previewMode" class="sticky top-0 z-[70] flex items-center justify-between gap-3 bg-amber-400 px-4 py-2 text-[12px] font-bold text-amber-950"><span>Admin preview · registration is disabled.</span><RouterLink :to="'/events/'+route.params.id" class="rounded bg-amber-950 px-3 py-1 text-white">Back to event</RouterLink></div>
 
-  <header class="sticky top-0 z-50 bg-white shadow-[0_1px_0_rgba(0,0,0,.07)]">
-    <div class="mx-auto flex h-[66px] max-w-[1240px] items-center gap-4 px-4 sm:px-6">
-      <RouterLink to="/discover" class="flex shrink-0 items-center gap-2"><span class="grid h-9 w-9 place-items-center rounded-[10px] event-primary text-[11px] font-black text-white">DS</span><span class="hidden text-[19px] font-black tracking-[-.04em] sm:block">DigiSangam</span></RouterLink>
-      <RouterLink to="/discover" class="relative min-w-0 flex-1 sm:max-w-[620px]"><span class="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400">⌕</span><span class="flex h-10 items-center rounded-[8px] border border-[#dedfe3] pl-11 pr-4 text-[12px] text-slate-400">Search for events, conferences, workshops and more</span></RouterLink>
-      <RouterLink to="/access" class="ml-auto rounded-[7px] event-primary px-4 py-2 text-[11px] font-bold text-white">Organizer</RouterLink>
-    </div>
-  </header>
+  <MarketplaceHeader :query="headerQuery" :city="headerCity" :cities="headerCity==='All'?[]:[headerCity]" context="event" @update:query="headerQuery=$event" @update:city="marketplaceCity" @search="marketplaceSearch"/>
 
   <div v-if="loading" class="mx-auto max-w-[1240px] px-4 py-8 sm:px-6"><div class="h-[380px] animate-pulse rounded-[18px] bg-slate-200"></div></div>
   <div v-else-if="error&&!data" class="grid min-h-[70vh] place-items-center p-6"><div class="max-w-md text-center"><div class="mx-auto grid h-14 w-14 place-items-center rounded-2xl bg-rose-50 font-black text-rose-600">!</div><h1 class="mt-4 text-2xl font-black">Registration unavailable</h1><p class="mt-2 text-sm text-slate-500">{{error}}</p><RouterLink to="/discover" class="mt-5 inline-flex rounded-lg event-primary px-5 py-2.5 text-sm font-bold text-white">Explore events</RouterLink></div></div>
 
   <template v-else-if="data">
-    <section class="public-event-hero relative overflow-hidden bg-[#171c3a] text-white">
+    <section class="public-event-hero ds-market-event-hero relative overflow-hidden bg-[#171c3a] text-white">
       <img v-if="data.event.branding?.cover_url" :src="data.event.branding.cover_url" alt="" class="absolute inset-0 h-full w-full object-cover opacity-[.16] blur-xl"/>
       <div class="absolute inset-0 bg-gradient-to-r from-[#151a32] via-[#171d3b]/95 to-[#1b2248]/80"></div>
 
-      <div class="relative mx-auto grid max-w-[1240px] gap-7 px-4 py-9 sm:px-6 lg:grid-cols-[250px_minmax(0,1fr)_230px] lg:items-center lg:py-12">
+      <div class="relative mx-auto grid max-w-[1280px] gap-8 px-4 py-10 sm:px-6 lg:grid-cols-[245px_minmax(0,1fr)_240px] lg:items-center lg:py-16">
         <div class="mx-auto w-full max-w-[250px]">
           <div class="aspect-[2/3] overflow-hidden rounded-[19px] bg-slate-800 shadow-[0_24px_65px_rgba(0,0,0,.40)]">
             <img v-if="data.event.branding?.poster_url||data.event.branding?.cover_url" :src="data.event.branding?.poster_url||data.event.branding?.cover_url" :alt="data.event.name" loading="eager" decoding="async" class="h-full w-full object-cover"/>
@@ -259,11 +258,11 @@ async function submit(){
       </div>
     </section>
 
-    <section id="registration-flow" class="public-event-checkout bg-white py-12 pb-28 lg:pb-16">
+    <section id="registration-flow" class="public-event-checkout ds-market-checkout bg-white py-12 pb-28 lg:pb-16">
       <div class="mx-auto max-w-[1240px] px-4 sm:px-6">
-        <div class="mb-6"><p class="text-[10px] font-black uppercase tracking-[.16em] event-text">Registration</p><h2 class="mt-1 text-[24px] font-black tracking-[-.025em]">Book your place</h2></div>
+        <div class="mb-7"><p class="text-[11px] font-black uppercase tracking-[.17em] event-text">YOUR NEXT EXPERIENCE</p><h2 class="mt-2 text-[clamp(1.5rem,3vw,2.3rem)] font-black tracking-[-.045em]">Make your booking</h2><p class="mt-2 text-sm text-slate-500">Choose your ticket, provide attendee details and check out securely.</p></div>
 
-        <div class="mb-6 flex gap-2 overflow-x-auto">
+        <div class="ds-market-steps mb-6 flex gap-2 overflow-x-auto">
           <div v-for="(label,i) in ['Choose ticket','Your details','Review & pay']" :key="label" class="flex shrink-0 items-center gap-2 rounded-full px-3 py-2 text-[11px] font-bold" :class="i+1<=step?'event-primary':'bg-[#f2f2f4] text-slate-500'"><span class="grid h-5 w-5 place-items-center rounded-full bg-white/15">{{i+1}}</span>{{label}}</div>
         </div>
 
@@ -297,7 +296,7 @@ async function submit(){
             <div class="mt-7 flex justify-between border-t border-slate-100 pt-5"><button v-if="step>1" class="rounded-[8px] border border-slate-200 px-4 py-2.5 text-[12px] font-bold" @click="step--">← Back</button><span v-else></span><button v-if="step<3" class="rounded-[8px] event-primary px-5 py-2.5 text-[12px] font-black text-white" @click="next">Continue →</button><button v-else class="rounded-[8px] event-primary px-5 py-2.5 text-[12px] font-black text-white disabled:opacity-50" :disabled="busy||previewMode" @click="submit">{{previewMode?'Preview only':(busy?'Processing…':(Number(selected?.price||0)>0?'Register & Pay':'Complete registration'))}}</button></div>
           </section>
 
-          <aside class="rounded-[14px] bg-[#f7f7f8] p-5 lg:sticky lg:top-[86px] lg:self-start">
+          <aside class="ds-market-booking-summary rounded-[16px] bg-[#f7f7f8] p-5 lg:sticky lg:top-[86px] lg:self-start">
             <p class="text-[10px] font-black uppercase tracking-wider text-slate-400">Booking summary</p><h3 class="mt-2 text-[15px] font-black">{{data.event.name}}</h3>
             <div class="mt-4 space-y-2.5 text-[11px] text-slate-600"><p>◷ {{data.event.start_date||data.event.date}}</p><p>⌖ {{data.event.venue_name||data.event.location}}</p><p>◎ {{data.registration.approval_mode==='manual'?'Manual approval':data.registration.approval_mode==='invite_only'?'Invitation only':'Instant approval'}}</p></div>
             <div v-if="selected" class="mt-5 border-t border-slate-200 pt-4"><div class="flex items-center justify-between text-[12px]"><span>{{selected.name}}</span><b>{{money(selected.price)}}</b></div></div>

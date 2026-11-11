@@ -42,7 +42,14 @@ async function request(path,options={}){
 }
 
 export const api={
-  publicEvents:()=>publicRequest('/public/events'),
+  publicEvents:(filters={})=>{
+    const params=new URLSearchParams()
+    for(const [key,value] of Object.entries(filters)){
+      if(value!==undefined&&value!==null&&value!=='')params.set(key,String(value))
+    }
+    const search=params.toString()
+    return publicRequest('/public/events'+(search?'?'+search:''))
+  },
   publicInvitation:(token)=>publicRequest('/public/invitations/'+encodeURIComponent(token)),
   publicEvent:(id)=>publicRequest('/public/events/'+encodeURIComponent(id)),
   publicRegister:(id,payload)=>publicRequest('/public/events/'+encodeURIComponent(id)+'/register',{method:'POST',body:JSON.stringify(payload)}),

@@ -123,6 +123,11 @@ try{
     $discovery=request('GET','/api/v1/public/events')['data'];
     if(($discovery['total']??0)!==1||($discovery['events'][0]['id']??'')!==$eventId) fail('Public discovery list is incorrect.',$discovery);
     if(($discovery['events'][0]['min_price']??-1)!==0||!in_array('Technology',$discovery['categories']??[],true)) fail('Public discovery metadata is incorrect.',$discovery);
+    $discoveryFiltered=request('GET','/api/v1/public/events?city=Pune&category=Technology&q=Audit&sort=date')['data'];
+    if(($discoveryFiltered['total']??0)!==1||($discoveryFiltered['events'][0]['id']??'')!==$eventId)fail('HTTP discovery query filtering failed.',$discoveryFiltered);
+    $discoveryHidden=request('GET','/api/v1/public/events?city=Mumbai&q=Audit')['data'];
+    if(($discoveryHidden['total']??-1)!==0)fail('HTTP city filter returned an unrelated event.',$discoveryHidden);
+
 
     $registrationResult=request('POST','/api/v1/public/events/'.rawurlencode($eventId).'/register',[
         'ticket_id'=>$ticketId,

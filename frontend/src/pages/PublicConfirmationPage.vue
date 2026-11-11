@@ -60,14 +60,14 @@ async function issueWallet(platform){
 }
 </script>
 <template>
-<main class="min-h-screen bg-[#f5f7fb] p-5 text-slate-950 sm:p-8">
+<main class="marketplace-confirmation min-h-screen bg-[#f5f7fb] p-5 text-slate-950 sm:p-8">
   <div class="mx-auto max-w-3xl">
-    <div class="no-print mb-8 flex items-center justify-between gap-4"><div class="flex items-center gap-3"><div class="grid h-10 w-10 place-items-center rounded-xl bg-indigo-600 text-xs font-black text-white">DS</div><div><b>DigiSangam</b><p class="text-xs text-slate-400">Registration confirmation</p></div></div><button v-if="data" class="rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-bold" @click="printDocument">Print / Save PDF</button></div>
+    <div class="marketplace-confirmation__top no-print mb-8 flex items-center justify-between gap-4"><RouterLink to="/discover" class="marketplace-confirmation__logo flex items-center gap-3"><span class="grid h-10 w-10 place-items-center rounded-xl text-xs font-black text-white">DS</span><span><b>DigiSangam</b><small class="block">MY EXPERIENCES / DIGITAL TICKET</small></span></RouterLink><button v-if="data" class="marketplace-confirmation__print rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-bold" @click="printDocument">Print / Save PDF ↗</button></div>
     <div v-if="loading" class="h-96 animate-pulse rounded-[28px] bg-white"></div>
     <div v-else-if="error" class="rounded-[28px] border border-rose-100 bg-white p-10 text-center"><div class="mx-auto grid h-14 w-14 place-items-center rounded-full bg-rose-50 font-black text-rose-600">!</div><h1 class="mt-4 text-2xl font-black">Confirmation unavailable</h1><p class="mt-2 text-sm text-slate-500">{{error}}</p></div>
     <template v-else-if="data">
-      <section class="print-card overflow-hidden rounded-[28px] border border-slate-200 bg-white shadow-sm">
-        <div class="bg-slate-950 p-7 text-white sm:p-9"><div class="flex flex-wrap items-center gap-2"><span class="rounded-full px-3 py-1.5 text-xs font-black" :class="data.attendee.status==='Confirmed'?'bg-emerald-400/15 text-emerald-300':'bg-amber-400/15 text-amber-300'">{{data.attendee.status}}</span><span v-if="data.order" class="rounded-full bg-white/10 px-3 py-1.5 text-xs font-black">{{data.order.status==='paid'?'Payment paid':'Payment '+data.order.status}}</span></div><h1 class="mt-5 text-3xl font-black tracking-tight">{{confirmed?'You’re registered.':!paymentSettled?'Payment awaiting confirmation.':'Registration received.'}}</h1><p class="mt-2 text-sm text-slate-300">{{data.event?.name}}</p></div>
+      <section class="print-card marketplace-confirmation__pass overflow-hidden rounded-[28px] border border-slate-200 bg-white shadow-sm">
+        <div class="marketplace-confirmation__status bg-slate-950 p-7 text-white sm:p-9"><div class="flex flex-wrap items-center gap-2"><span class="rounded-full px-3 py-1.5 text-xs font-black" :class="data.attendee.status==='Confirmed'?'bg-emerald-400/15 text-emerald-300':'bg-amber-400/15 text-amber-300'">{{data.attendee.status}}</span><span v-if="data.order" class="rounded-full bg-white/10 px-3 py-1.5 text-xs font-black">{{data.order.status==='paid'?'Payment paid':'Payment '+data.order.status}}</span></div><h1 class="mt-5 text-3xl font-black tracking-tight">{{confirmed?'You’re registered.':!paymentSettled?'Payment awaiting confirmation.':'Registration received.'}}</h1><p class="mt-2 text-sm text-slate-300">{{data.event?.name}}</p></div>
         <div class="grid gap-7 p-7 sm:p-9 md:grid-cols-[1fr_340px]">
           <div>
             <p class="text-xs font-black uppercase tracking-widest text-slate-400">Attendee</p><h2 class="mt-2 text-xl font-black">{{data.attendee.name}}</h2><p class="mt-1 text-sm text-slate-500">{{data.attendee.email}}</p>
@@ -78,7 +78,7 @@ async function issueWallet(platform){
         </div>
       </section>
 
-      <section v-if="data.credential" class="no-print mt-5 rounded-[24px] border border-slate-200 bg-white p-6 shadow-sm">
+      <section v-if="data.credential" class="marketplace-confirmation__wallet no-print mt-5 rounded-[24px] border border-slate-200 bg-white p-6 shadow-sm">
         <p class="text-xs font-black uppercase tracking-widest text-slate-400">Mobile wallet</p>
         <h2 class="mt-2 text-xl font-black">Keep your event credential handy</h2>
         <div class="mt-4 flex flex-wrap gap-2"><button class="rounded-xl bg-slate-950 px-4 py-2.5 text-sm font-bold text-white" :disabled="walletBusy" @click="issueWallet('apple')">Apple Wallet</button><button class="rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-bold" :disabled="walletBusy" @click="issueWallet('google')">Google Wallet</button></div>
@@ -99,3 +99,17 @@ async function issueWallet(platform){
   </div>
 </main>
 </template>
+
+<style scoped>
+.marketplace-confirmation{background:radial-gradient(ellipse at 60% -10%,rgba(169,91,155,.12),transparent 55%),#faf7fb;color:#281f30}
+.marketplace-confirmation__top{background:#25162f;border-radius:18px;padding:16px 20px;color:#fff;box-shadow:0 14px 35px rgba(40,21,46,.14)}
+.marketplace-confirmation__logo span>span{background:linear-gradient(135deg,#f16da5,#98488d)}
+.marketplace-confirmation__logo b{font-size:17px;letter-spacing:-.045em}
+.marketplace-confirmation__logo small{font-size:9px;letter-spacing:.14em;color:#d9b9d9;margin-top:3px;font-weight:800}
+.marketplace-confirmation__print{background:#fff;color:#422849;border-color:#fff}
+.marketplace-confirmation__pass{border-color:#eaddec;box-shadow:0 14px 42px rgba(46,22,62,.07);border-radius:26px}
+.marketplace-confirmation__status{background:linear-gradient(112deg,#22132e,#5e3065 68%,#9e5385)}
+.marketplace-confirmation__status h1{letter-spacing:-.045em}
+.marketplace-confirmation__wallet{border-color:#eaddec}
+@media print{.marketplace-confirmation{background:#fff;padding:0!important}.marketplace-confirmation__pass{border-radius:0;box-shadow:none}}
+</style>

@@ -52,6 +52,8 @@ jobs:
         run: php tests/smoke.php
       - name: Ticket design persistence regression
         run: php tests/ticket_designs.php
+      - name: Public catalogue filtering and privacy regression
+        run: php tests/discovery_filter.php
       - name: Authentication regression tests
         run: php tests/auth_security.php
       - name: Public event HTML metadata and privacy tests

@@ -58,6 +58,7 @@ onMounted(() => { if (!events.loaded) events.load().catch(() => {}) })
         <svg v-if="theme.isDark" viewBox="0 0 24 24" class="h-[19px] w-[19px]" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2 M12 20v2 M2 12h2 M20 12h2 M4.93 4.93l1.42 1.42 M17.65 17.65l1.42 1.42 M4.93 19.07l1.42-1.42 M17.65 6.35l1.42-1.42"/></svg>
         <svg v-else viewBox="0 0 24 24" class="h-[19px] w-[19px]" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M20.9 13.2A8.8 8.8 0 0 1 10.8 3.1 9 9 0 1 0 20.9 13.2Z"/></svg>
       </button>
+      <RouterLink to="/discover" class="ds-admin-public-link hidden xl:inline-flex" aria-label="Open public marketplace">View marketplace <span aria-hidden="true">↗</span></RouterLink>
       <RouterLink to="/intelligence" class="icon-btn" aria-label="Intelligence" title="Intelligence">
         <svg viewBox="0 0 24 24" class="h-[19px] w-[19px]" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="m12 2 2.4 7.6L22 12l-7.6 2.4L12 22l-2.4-7.6L2 12l7.6-2.4z"/></svg>
       </RouterLink>
