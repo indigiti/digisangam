@@ -35,6 +35,7 @@ export default createRouter({
     {path:'/access',name:'access',component:AccessPage,meta:{public:true}},
     {path:'/discover',name:'public-discover',component:PublicDiscoveryPage,meta:{public:true}},
     {path:'/e/:id',name:'public-event',component:PublicEventPage,meta:{public:true}},
+    {path:'/e/:id/register',name:'public-registration',component:PublicEventPage,meta:{public:true}},
     {path:'/events/:id/preview',name:'event-preview',component:PublicEventPage},
     {path:'/e/:id/confirmation/:token',name:'public-confirmation',component:PublicConfirmationPage,meta:{public:true}},
     {path:'/',component:AppShell,children:[
