@@ -22,7 +22,7 @@ const form={
   ],
 }
 
-async function mockBackend(page, onRegistration = () => {}, eventFixture = event) {
+async function mockBackend(page, onRegistration = () => {}, eventFixture = event, formFixture = form) {
   await page.route('**/api/v1/**',route=>{
     const url=new URL(route.request().url())
     const path=url.pathname.split('/api/v1/')[1]||''
@@ -30,7 +30,7 @@ async function mockBackend(page, onRegistration = () => {}, eventFixture = event
     if(path==='auth/status')return json({setup_required:false,csrf_token:'csrf_fixture',user:{id:'usr',name:'QA Organizer',role:'super_admin'}})
     if(path==='events')return json([eventFixture,{...eventFixture,id:'evt_two',name:'Second Summit',status:'Draft',location:'Mumbai'}])
     if(path==='public/events')return json({events:[eventFixture],categories:['Technology'],locations:['Pune']})
-    if(path==='public/events/evt_public')return json({event:eventFixture,tickets,registration:form})
+    if(path==='public/events/evt_public')return json({event:eventFixture,tickets,registration:formFixture})
     if(path==='public/events/evt_public/register'&&route.request().method()==='POST'){
       onRegistration(route.request().postDataJSON())
       return json({confirmation_token:'demo-token'})
@@ -82,6 +82,9 @@ test('P2 public event metadata, brand contrast and sold-out protection',async({p
   await expect(page.locator('script[type="application/ld+json"]')).toHaveCount(1)
   const accent=await page.locator('main.public-event').evaluate(node=>getComputedStyle(node).getPropertyValue('--event-accent').trim())
   expect(accent).toBe('#f4dc3b')
+  await page.getByRole('button',{name:'Book / Register',exact:true}).click()
+  await expect(page).toHaveURL(/\/e\/evt_public\/register$/)
+  await expect(page.locator('meta[name="robots"]')).toHaveAttribute('content','noindex,nofollow')
   await expect(page.getByRole('button',{name:/Early bird/})).toBeDisabled()
   await expect(page.getByRole('button',{name:/General admission/})).toBeEnabled()
 })
@@ -90,6 +93,8 @@ test('P2 valid free ticket completes server registration and shows verified stat
   let registered=null
   await mockBackend(page,payload=>{registered=payload})
   await page.goto(base+'e/evt_public')
+  await page.getByRole('button',{name:'Book / Register',exact:true}).click()
+  await expect(page).toHaveURL(/\/e\/evt_public\/register$/)
   await page.getByRole('button',{name:/General admission/}).click()
   await page.getByRole('button',{name:/Continue/}).click()
   await page.getByLabel(/Full Name/).fill('QA Attendee')
@@ -122,3 +127,26 @@ for (const designId of ticketDesignIds) {
     await expect(ticket.locator('img[alt="DigiSangam signed attendee QR credential"]')).toBeVisible()
   })
 }
+
+test('P2 guided registration validates and retains the required mobile number',async({page})=>{
+  let registered=null
+  const mobileForm={...form,fields:[...form.fields,{id:'fld_phone',label:'Mobile number',type:'phone',required:true,visibility:'always'}]}
+  await mockBackend(page,payload=>{registered=payload},event,mobileForm)
+  await page.goto(base+'e/evt_public/register')
+  await expect(page.getByRole('heading',{name:'Start with your mobile number'})).toBeVisible()
+  await page.getByLabel('Mobile number').fill('123')
+  await page.getByRole('button',{name:/Continue/}).click()
+  await expect(page.getByRole('alert')).toContainText('Enter a valid mobile number')
+  await page.getByLabel('Mobile number').fill('+91 98765 43210')
+  await page.getByRole('button',{name:/Continue/}).click()
+  await page.getByRole('button',{name:/General admission/}).click()
+  await page.getByRole('button',{name:/Continue/}).click()
+  await expect(page.getByLabel('Mobile number')).toHaveCount(0)
+  await page.getByLabel('Full Name').fill('QA Attendee')
+  await page.getByLabel('Email Address').fill('qa@example.test')
+  await page.getByRole('button',{name:/Continue/}).click()
+  await expect(page.getByText('+91 98765 43210',{exact:true})).toBeVisible()
+  await page.getByRole('button',{name:'Complete registration'}).click()
+  await expect(page.getByRole('heading',{name:'You’re registered.'})).toBeVisible()
+  expect(registered?.answers?.fld_phone).toBe('+91 98765 43210')
+})
