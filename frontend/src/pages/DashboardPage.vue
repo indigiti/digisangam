@@ -64,32 +64,32 @@ watch(()=>events.currentId,load)
     </section>
 
     <template v-else-if="data">
-      <section class="premium-hero p-6 sm:p-8 lg:p-9">
+      <section class="panel p-5 sm:p-6">
         <div class="relative grid gap-8 lg:grid-cols-[1fr_auto] lg:items-center">
           <div class="min-w-0 max-w-[780px]">
             <div class="mb-4 flex flex-wrap items-center gap-2">
-              <span class="premium-tag"><span class="h-1.5 w-1.5 rounded-full" :class="data.event.status==='Live'?'bg-emerald-300':'bg-indigo-300'"></span>{{data.event.status}}</span>
-              <span class="premium-tag">{{data.event.date||'Date to be confirmed'}}</span>
+              <span class="soft-pill"><span class="h-1.5 w-1.5 rounded-full" :class="data.event.status==='Live'?'bg-emerald-300':'bg-indigo-300'"></span>{{data.event.status}}</span>
+              <span class="soft-pill">{{data.event.date||'Date to be confirmed'}}</span>
             </div>
-            <p class="text-[11px] font-bold uppercase tracking-[.16em] text-indigo-100/65">Your active event</p>
-            <h2 class="mt-2 max-w-2xl text-[clamp(1.6rem,3vw,2.65rem)] font-extrabold leading-[1.1] tracking-[-.045em] text-white">{{data.event.name}}</h2>
-            <p class="mt-3 flex flex-wrap items-center gap-2 text-sm text-indigo-100/80">
+            <p class="text-[11px] font-bold uppercase tracking-[.16em] text-slate-500">Your active event</p>
+            <h2 class="mt-2 max-w-2xl text-[clamp(1.6rem,3vw,2.65rem)] font-extrabold leading-[1.1] tracking-[-.045em] text-slate-800">{{data.event.name}}</h2>
+            <p class="mt-3 flex flex-wrap items-center gap-2 text-sm text-slate-600">
               <span>{{data.event.location||'Venue not set'}}</span>
               <span class="text-indigo-300/50" aria-hidden="true">•</span>
               <span>Managed in DigiSangam</span>
             </p>
             <div class="mt-6 flex flex-wrap gap-3">
               <RouterLink :to="'/events/'+data.event.id" class="inline-flex min-h-10 items-center justify-center rounded-xl bg-white px-4 py-2.5 text-xs font-extrabold text-indigo-950 transition hover:bg-indigo-50">Manage event <span class="ml-2" aria-hidden="true">↗</span></RouterLink>
-              <RouterLink to="/attendees" class="inline-flex min-h-10 items-center justify-center rounded-xl border border-white/20 bg-white/10 px-4 py-2.5 text-xs font-bold text-white transition hover:bg-white/20">View attendees</RouterLink>
+              <RouterLink to="/attendees" class="inline-flex min-h-10 items-center justify-center rounded-xl border border-white/20 bg-white/10 px-4 py-2.5 text-xs font-bold text-slate-800 transition hover:bg-white/20">View attendees</RouterLink>
             </div>
           </div>
-          <div class="flex items-center gap-4 rounded-2xl border border-white/15 bg-white/[.065] p-4 backdrop-blur-sm lg:min-w-[225px] lg:flex-col lg:gap-3 lg:p-6">
+          <div class="flex items-center gap-4 rounded-2xl border border-slate-200 bg-slate-50 p-4 backdrop-blur-sm lg:min-w-[225px] lg:flex-col lg:gap-3 lg:p-6">
             <div class="grid h-20 w-20 shrink-0 place-items-center rounded-full p-2 sm:h-24 sm:w-24" :style="{background:'conic-gradient(#b3adff '+Math.min(100,Math.max(0,Number(data.event.progress||0)))+'%, rgba(255,255,255,.14) 0)'}">
-              <div class="grid h-full w-full place-items-center rounded-full bg-[#222a50] text-lg font-extrabold text-white sm:text-xl">{{Math.min(100,Math.max(0,Number(data.event.progress||0)))}}%</div>
+              <div class="grid h-full w-full place-items-center rounded-full bg-slate-100 text-lg font-extrabold text-slate-800 sm:text-xl">{{Math.min(100,Math.max(0,Number(data.event.progress||0)))}}%</div>
             </div>
             <div class="text-left lg:text-center">
-              <p class="text-sm font-bold text-white">Setup readiness</p>
-              <p class="mt-1 text-xs leading-5 text-indigo-200/75">Complete event configuration before you go live.</p>
+              <p class="text-sm font-bold text-slate-800">Setup readiness</p>
+              <p class="mt-1 text-xs leading-5 text-slate-600">Complete event configuration before you go live.</p>
             </div>
           </div>
         </div>
